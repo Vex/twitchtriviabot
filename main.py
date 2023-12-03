@@ -14,12 +14,6 @@ import re, logging, sys
 import os
 from collections import Counter 
 
-from PyQt5.QtWidgets import QLabel, QFrame, QLineEdit, QPushButton, QCheckBox, QApplication, QMainWindow, \
-                            QFileDialog, QDialog, QScrollArea, QMessageBox, QWidget, QTextEdit
-from PyQt5 import QtCore, QtGui, QtTest
-from PyQt5.QtGui import QPixmap, QIntValidator, QPalette, QColor
-from PyQt5.QtCore import QThread, pyqtSignal, QTimer
-
 # try:
 #     THIS_FILEPATH = os.path.dirname( sys.executable)
 #     THIS_FILENAME = os.path.basename(sys.executable)
@@ -54,204 +48,53 @@ if not os.path.exists(os.path.abspath(os.path.join(THIS_FILEPATH,'config','score
     os.makedirs(os.path.abspath(os.path.join(THIS_FILEPATH,'config','scores')))
 if not os.path.exists(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music'))):
     os.makedirs(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music')))
-    
+
     with open(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music','track.txt')),'w') as f:
         f.write('Null track')
     with open(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music','artist.txt')),'w') as f:
         f.write('Null artist')
-    
 
-class MainWindow(QWidget):
-    SCREEN_HEIGHT = 400
-    SCREEN_WIDTH = 320
-    
+class MainLoop():
+
     def __init__(self):
-        self.BORDER = False
-        self.app = QApplication([])
-        super(MainWindow, self).__init__()
-        self.window = QMainWindow()
-        self.window.setFixedSize(self.SCREEN_WIDTH,self.SCREEN_HEIGHT)
-        self.window.setWindowTitle('Twitch Trivia Bot')
-        self.icon = QtGui.QIcon()
-        self.icon.addPixmap(QtGui.QPixmap("ico.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        self.window.setWindowIcon(self.icon)
         self.connection_active = False
         self.bot_status_dict = {"connect_status":"Inactive",
                                 "trivia_status":"Inactive"}
         self.bot_status_dict_init = {"connect_status":"Inactive",
                                 "trivia_status":"Inactive"}
-      
+
         self.tb = None
-            
-        self.title_bar = QLabel("",self.window)
-        self.title_bar.setGeometry(QtCore.QRect(0, 0, 320, 20))
-        self.title_bar.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignCenter)
-        if self.BORDER:
-            self.title_bar.setStyleSheet("border:2px solid rgb(255,255,255); ")     
-            
 
-        self.title_bar_text = QLabel("Twitch Trivia Bot version %s" % VERSION_NUM,self.window)
-        self.title_bar_text.setGeometry(QtCore.QRect(0, 0, 320, 20))
-        self.title_bar_text.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignCenter)
-        self.title_bar_text.setStyleSheet("background :rgb(72,72,72); ")
-#        if self.BORDER:
-#            self.title_bar_text.setStyleSheet("border:2px solid rgb(255,255,255); ")
-        
-        self.connect_status_label = QLabel("Bot status:", self.window)
-        self.connect_status_label.setGeometry(QtCore.QRect(0, 40, 80, 20))
-        self.connect_status_label.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.connect_status_label.setStyleSheet("border:2px solid rgb(255,255,255); ")    
-            
-        self.connect_status = QLabel(self.bot_status_dict['connect_status'],self.window)
-        self.connect_status.setGeometry(QtCore.QRect(80, 40, 80, 20))
-        self.connect_status.setAlignment(QtCore.Qt.AlignLeft)
-        self.connect_status.setStyleSheet("QLabel { color : red; }");      
-        if self.BORDER:
-            self.connect_status.setStyleSheet("border:2px solid rgb(255,255,255); ")    
-            
-        self.trivia_status_label = QLabel("Trivia status:", self.window)
-        self.trivia_status_label.setGeometry(QtCore.QRect(160, 40, 80, 20))
-        self.trivia_status_label.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.trivia_status_label.setStyleSheet("border:2px solid rgb(255,255,255); ")    
-            
-        self.trivia_status = QLabel(self.bot_status_dict['trivia_status'],self.window)
-        self.trivia_status.setGeometry(QtCore.QRect(240, 40, 80, 20))
-        self.trivia_status.setAlignment(QtCore.Qt.AlignLeft)
-        self.trivia_status.setStyleSheet("QLabel { color : red; }");      
-        if self.BORDER:
-            self.trivia_status.setStyleSheet("border:2px solid rgb(255,255,255); ")    
-            
-        self.category_label = QLabel("Category:",self.window)
-        self.category_label.setGeometry(QtCore.QRect(0, 80, 80, 20))
-        self.category_label.setAlignment(QtCore.Qt.AlignLeft)
-        self.category_label.setStyleSheet("QLabel { font-weight : bold; }");      
-        if self.BORDER:
-            self.category_label.setStyleSheet("border:2px solid rgb(255,255,255); ")   
-            
-        self.category_variable_text = QLabel("Sample category",self.window)
-        self.category_variable_text.setGeometry(QtCore.QRect(80, 80, 240, 20))
-        self.category_variable_text.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.category_variable_text.setStyleSheet("border:2px solid rgb(255,255,255); ")   
-            
 
-        
-        self.question_label = QLabel("Question:",self.window)
-        self.question_label.setGeometry(QtCore.QRect(0, 100, 80, 20))
-        self.question_label.setAlignment(QtCore.Qt.AlignLeft)
-        self.question_label.setStyleSheet("QLabel { font-weight : bold; }");      
-        if self.BORDER:
-            self.question_label.setStyleSheet("border:2px solid rgb(255,255,255); ")  
-            
-        self.question_variable_text = QLabel("Sample question",self.window)
-        self.question_variable_text.setGeometry(QtCore.QRect(80, 100, 240, 60))
-        self.question_variable_text.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.question_variable_text.setStyleSheet("border:2px solid rgb(255,255,255); ")  
-            
-        self.question_no_variable_text = QLabel("",self.window)
-        self.question_no_variable_text.setGeometry(QtCore.QRect(0, 120, 80, 20))
-        self.question_no_variable_text.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.question_no_variable_text.setStyleSheet("border:2px solid rgb(255,255,255); ")  
+    def connect(self):
+        self.tb = TriviaBot()  
+        if self.tb.valid:
+            #self.connect_button.setText("Disconnect")
+            self.connection_active = True
+            logging.debug("Starting connect loop")
+            iternum = 0
+            while self.tb.valid:
+                iternum += 1
+                if iternum % 300 == 0:
+                    # only update once every second
+                    self.update_console() 
+                self.tb.main_loop(command_line_mode = True)
+                #QtCore.QCoreApplication.processEvents()
+                time.sleep(1/120)
+        else:
+            #msg = QMessageBox()
+            #msg.setWindowTitle("Error message")
+            #msg.setText("Error message:\n%s" % self.tb.error_msg)
+            print("Error message:\n%s" % self.tb.error_msg)
+            #msg.exec_()
 
-        self.top3_label = QLabel("Top 3:",self.window)
-        self.top3_label.setGeometry(QtCore.QRect(0, 160, 80, 20))
-        self.top3_label.setAlignment(QtCore.Qt.AlignLeft)
-        self.top3_label.setStyleSheet("QLabel { font-weight : bold; }");      
-        if self.BORDER:
-            self.top3_label.setStyleSheet("border:2px solid rgb(255,255,255); ")  
-            
-        self.top3_variable_text = QLabel("Top 3 sample",self.window)
-        self.top3_variable_text.setGeometry(QtCore.QRect(80, 160, 240, 60))
-        self.top3_variable_text.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.top3_variable_text.setStyleSheet("border:2px solid rgb(255,255,255); ")   
+    def update_console(self):
+        print("Connection status: %s" % self.bot_status_dict['connect_status'])
+        print("Trivia status: %s" % self.bot_status_dict['trivia_status'])
 
-            
-        self.answer_label = QLabel("Answer(s):",self.window)
-        self.answer_label.setGeometry(QtCore.QRect(0, 240, 80, 20))
-        self.answer_label.setAlignment(QtCore.Qt.AlignLeft)
-        self.answer_label.setStyleSheet("QLabel { font-weight : bold; }");      
-        if self.BORDER:
-            self.answer_label.setStyleSheet("border:2px solid rgb(255,255,255); ")  
-            
-        self.answer_variable_text = QLabel("Sample answer",self.window)
-        self.answer_variable_text.setGeometry(QtCore.QRect(80, 240, 240, 20))
-        self.answer_variable_text.setAlignment(QtCore.Qt.AlignLeft)
-        if self.BORDER:
-            self.answer_variable_text.setStyleSheet("border:2px solid rgb(255,255,255); ")   
 
-       
-        self.category_label.setVisible(False)
-        self.question_label.setVisible(False)
-        self.answer_label.setVisible(False)            
-        self.top3_label.setVisible(False)            
-        self.category_variable_text.setVisible(False)
-        self.question_variable_text.setVisible(False)
-        self.answer_variable_text.setVisible(False)
-        self.top3_variable_text.setVisible(False)
-        self.question_no_variable_text.setVisible(False)
-
-        self.category_variable_text.setWordWrap(True)
-        self.question_variable_text.setWordWrap(True)
-        self.answer_variable_text.setWordWrap(True)
-        
-        
-        
-        self.connect_button = QPushButton("Connect",self.window)
-        self.connect_button.setGeometry(QtCore.QRect(0, 340, 70, 30))
-        self.connect_button.clicked.connect(self.toggle_connect)
-        
-        self.trivia_start_button = QPushButton("Start Trivia",self.window)
-        self.trivia_start_button.setGeometry(QtCore.QRect(80, 340, 70, 30))
-        self.trivia_start_button.clicked.connect(self.toggle_start_trivia)
-        self.trivia_start_button.setVisible(False)
-        
-        self.trivia_skip_button = QPushButton("Skip",self.window)
-        self.trivia_skip_button.setGeometry(QtCore.QRect(160, 340, 70, 30))
-        self.trivia_skip_button.clicked.connect(self.skip_question)
-        self.trivia_skip_button.setVisible(False)
-        
-        self.trivia_startq_button = QPushButton("Start Q",self.window)
-        self.trivia_startq_button.setGeometry(QtCore.QRect(160, 340, 70, 30))
-        self.trivia_startq_button.clicked.connect(self.start_question)
-        self.trivia_startq_button.setVisible(False)
-        
-        self.trivia_endq_button = QPushButton("End Q",self.window)
-        self.trivia_endq_button.setGeometry(QtCore.QRect(240, 340, 70, 30))
-        self.trivia_endq_button.clicked.connect(self.end_question)
-        self.trivia_endq_button.setVisible(False)
-
-        self.footer_bar_text = QLabel("Developed by @cleartonic  |  twitch.tv/cleartonic",self.window)
-        self.footer_bar_text.setGeometry(QtCore.QRect(0, 380, 320, 20))
-        self.footer_bar_text.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignCenter)
-        self.footer_bar_text.setStyleSheet("background :rgb(72,72,72); ")
-#        if self.BORDER:
-#            self.footer_bar_text.setStyleSheet("border:2px solid rgb(255,255,255); ")
-        
-        # Final settings
-        self.app.setStyle('Fusion')
-        self.app.setFont(QtGui.QFont("Roboto", 9))
-        
-        palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(0, 0, 0))
-        palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
-        palette.setColor(QPalette.Base, QColor(0, 0, 0))
-        palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(QPalette.ToolTipBase, QColor(255, 255, 255))
-        palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
-        palette.setColor(QPalette.Text, QColor(255, 255, 255))
-        palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
-        palette.setColor(QPalette.BrightText, QColor(120, 120, 0))
-        palette.setColor(QPalette.Link, QColor(42, 130, 218))
-        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
-        self.app.setPalette(palette)
-
+"""
+class MainWindow(QWidget):
 
     def update_gui(self):
         '''
@@ -412,14 +255,14 @@ class MainWindow(QWidget):
         self.connect_button.setText("Connect")
         self.hide_other_buttons()
         self.tb.stop_bot()
-
+"""
 
 
 # SETTINGS
 # TriviaBot object sets up and manages Session objects
-        
+
 class TriviaBot(object):
-    
+
     def __init__(self):
         logging.debug("Begin setting up Trivia Bot...")
         self.valid = True
@@ -432,7 +275,7 @@ class TriviaBot(object):
         with open(os.path.join(THIS_FILEPATH,'config','auth_config.yml'),'r') as f:
             temp_config = yaml.safe_load(f)
             self.validate_auth_config(temp_config)
-            
+
         if self.valid:
             try:
                 logging.debug("Setting up Chat Bot...")
@@ -444,15 +287,15 @@ class TriviaBot(object):
                                   '!stopbot':self.stop_bot,
                                   '!loadsession':self.load_trivia_session,
                                   '!savesession':self.save_trivia_session}
-            
+
             self.commands_list = {'!score':self.check_active_session_score}
             self.admins = [i.strip() for i in self.trivia_config['admins'].split(",")]
-                
+
             logging.debug("Finished setting up Trivia Bot.")
         else:
             logging.debug("Invalid setup - please check trivia_config.yml file")
-            
-            
+
+
     def validate_trivia_config(self,temp_config):
         for k, v in temp_config.items():
             if k == 'filename':
@@ -484,7 +327,7 @@ class TriviaBot(object):
                 if type(v) != bool:
                     self.error_msg = "Config error: Music mode must be set to true or false"
                     logging.debug(self.error_msg)
-                    self.valid = False                 
+                    self.valid = False
                 if v == True:
                     if "poll2" not in temp_config['mode']:
                         self.error_msg = "Config error: When using music mode, mode 'poll2' must be chosen"
@@ -494,7 +337,7 @@ class TriviaBot(object):
                         self.error_msg = "Config error: When using music mode, length 'infinite' must be chosen"
                         logging.debug(self.error_msg)
                         self.valid = False
-                    
+
 
         if self.valid:
             logging.debug("Passed trivia_config validation.")
@@ -534,16 +377,16 @@ class TriviaBot(object):
         logging.debug("Starting session...")
         if not self.trivia_active:
             if not self.active_session or start_new_override: #if there's already a session, ignore, unless from command
-                self.active_session = Session(self.cb, self.trivia_config)    
+                self.active_session = Session(self.cb, self.trivia_config)
             self.active_session.trivia_status = "Active"
             logging.debug(self.active_session.trivia_status)
             self.cb.s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
-            
+
             # setup
             try:
                 if self.active_session.question_count < 1:
                     self.cb.send_message("No questions were loaded. Check log for issue reporting and restart the trivia bot.")
-                else:                    
+                else:
                     if self.trivia_config['length'] == 'infinite':
                         self.cb.send_message("Trivia has begun! Infinite question mode. Trivia will start in %s seconds." % (self.active_session.session_config['question_delay']))
                     else:
@@ -553,7 +396,7 @@ class TriviaBot(object):
                     self.active_session.trivia_active = True
                     self.trivia_active = True
                     self.active_session.call_question()
-        
+
             except:
                 logging.debug("Error on session %s" % traceback.print_exc())
         else:
@@ -579,15 +422,19 @@ class TriviaBot(object):
         load trivia session to pickle file
         '''
         if not self.trivia_active:
-            with open('latest_session.p', 'rb') as p:
-                load_session = pickle.load(p)
-                load_session.cb = self.cb
-                self.active_session = load_session
+            try:
+                with open('latest_session.p', 'rb') as p:
+                    load_session = pickle.load(p)
+                    load_session.cb = self.cb
+                    self.active_session = load_session
             
-            logging.debug("Latest trivia session loaded.")
-            self.cb.send_message("Latest trivia session loaded. Beginning trivia...")
+                logging.debug("Latest trivia session loaded.")
+                self.cb.send_message("Latest trivia session loaded. Beginning trivia...")
+            except:
+                logging.debug("Unable to load session, file not found.")
+                self.cb.send_message("No previous session found.")
             self.start_session(False)
-            
+
         else:
             if self.trivia_active:
                 logging.debug("Trivia session active, cannot load during session.")
@@ -659,7 +506,7 @@ class TriviaBot(object):
         While trivia is not active, it will check only handle_triviabot_message for incoming messages
         While trivia is active, it will delegate to the active session
         '''
-        
+
         if command_line_mode:
             iternum = 0
             while self.valid:
@@ -669,23 +516,23 @@ class TriviaBot(object):
                         logging.debug("Iternum %s : trivia_active %s active_session.trivia_active %s" % (iternum, self.trivia_active, self.active_session.trivia_active))
                     except:
                         logging.debug("Iternum %s : %s" % (iternum, self.trivia_active))
-                        
+
                 if self.active_session.trivia_active:
                     self.handle_active_session()
                 else:
                     username, message, clean_message = self.cb.retrieve_messages()
-        
+
                     if message and username !='tmi':
                         logging.debug(username)
                         logging.debug(self.cb.bot_config['nick'])
                         logging.debug("Message received:\n%s " % message)
-                        
-        
+
+
                     if message:
                         if not self.trivia_active: #when a session is NOT running
                             self.handle_triviabot_message(username, clean_message)
-                        
-                            
+
+
                     if self.trivia_active: # when a session is running
                         # check every iteration if trivia is active or not, to set the trivia bot to be inactive
                         if not self.active_session.trivia_active:
@@ -694,9 +541,8 @@ class TriviaBot(object):
                         pass
 
 
-                        
-                
-    
+
+
                 time.sleep(1 / 120)
             logging.debug("Trivia bot no longer valid, ending program.")
         else:
@@ -705,37 +551,38 @@ class TriviaBot(object):
                 self.handle_active_session()
             else:
                 username, message, clean_message = self.cb.retrieve_messages()
-    
+
                 if message and username !='tmi':
                     logging.debug(username)
                     logging.debug(self.cb.bot_config['nick'])
                     logging.debug("Message received:\n%s " % message)
-                    
-    
+
+
                 if message:
                     if not self.trivia_active: #when a session is NOT running
-                        
+
                         # if theres a command thats recognized, the loop may happen elsewhere
-                        # this happens with !triviastart 
+                        # this happens with !triviastart
                         self.handle_triviabot_message(username, clean_message)
-                    
-                        
+
+
                 if self.trivia_active: # when a session is running
                     # check every iteration if trivia is active or not, to set the trivia bot to be inactive
                     if not self.active_session.trivia_active:
                         logging.debug("Setting trivia to inactive based on active_session...")
                         self.trivia_active = False
                     pass
-                            
-                
-    
+
+
+
 class NullSession():
-    trivia_active = False     
+    trivia_active = False
     trivia_status = "Inactive"
 
 class Session(object):
+
     def __init__(self, cb, trivia_config):
-        logging.debug("Beging setting up Session...")
+        logging.debug("Begin setting up Session...")
         logging.debug("Setting up session constants...")
         self.cb = cb
         self.userscores = {}                         # Dictionary holding user scores, kept in '!' and loaded/created upon trivia. [1,2,3] 1: Session score 2: Total trivia points 3: Total wins
@@ -762,10 +609,10 @@ class Session(object):
                                 'hint2':self.call_hint2,
                                 'skip':self.skip_question}
 
-        self.TIMER = 0                               # Ongoing active timer 
-        self.bonus_round = False              
-        
-        
+        self.TIMER = 0                               # Ongoing active timer
+        self.bonus_round = False
+
+
         logging.debug("Loading config...")
         self.session_config = trivia_config
         self.admins = [i.strip() for i in trivia_config['admins'].split(",")]
@@ -780,15 +627,14 @@ class Session(object):
                 self.question_count = 99999
                 self.ts = {}
                 self.ss = {}
-                
+
             else:
                 logging.debug("Loading trivia data...")
                 try:
                     with open(os.path.join(THIS_FILEPATH,'config',self.session_config['file_name']),'r',encoding=self.session_config['csv_encoding']) as f:
-                        data_source = f.read()            
+                        data_source = f.read()
                     data = csv.reader(data_source.splitlines(),quotechar='"', delimiter=',',quoting=csv.QUOTE_ALL, skipinitialspace=True)
                 except:
-                    
                     logging.debug("Error on reading csv file. Check encoding format set in trivia_config is the same as csv file")
                 self.ts = {}
                 for idx, i in enumerate(data):
@@ -796,17 +642,21 @@ class Session(object):
                         answer, answer2, answer3, answer4, answer5 = None, None, None, None, None
                         if len(i) == 8:
                             category, question, answer, answer2, answer3, answer4, answer5, creator = i
-                        else:
+                        elif len(i) == 5:
                             category, question, answer, answer2, creator = i
+                        else:
+                            category, question, answer = i
+                            creator = 'Anon'
                         if question.lower() == 'question':
                             logging.debug("Data line was ignored for csv header")
                         elif answer != '' and category != '' and question != '':
                             self.ts[idx] = {'category':category, 'question':question, 'answer':answer,'answer2':answer2, 'answer3':answer3, 'answer4':answer4, 'answer5':answer5,'creator':creator}
                         else:
                             logging.debug("Data line was ignored, make sure category, question and answer are non null fields: %s" % i)
-                    except:
+                    except Exception as e:
                         logging.debug("Error on data line, check number of fields: %s" % i)
-    
+                        logging.debug("Exception: %s " % e)
+
                 if self.session_config['mode'] == 'poll2':
                     logging.debug("Mode set to poll2, only taking questions with valid answer/answer2...")
                     valid_keys = [i for i in self.ts if self.ts[i]['answer2'] != '']
@@ -1543,12 +1393,12 @@ class ChatBot(object):
                 self.s.send("JOIN #{}\r\n".format(self.bot_config['chan'].lower()).encode("utf-8"))
                 time.sleep(1)
                 self.send_message(self.infomessage)
-                self.s.setblocking(0)       
+                self.s.setblocking(0)
         except Exception as e:
             logging.debug("Connection failed. Check config settings and reload bot.\nError code:\n%s" % str(e))
             self.valid = False
         logging.debug("Finished setting up Chat Bot.")
-        
+
     ### Chat message sender func
     def send_message(self, msg):
         answermsg = ":"+self.bot_config['nick']+"!"+self.bot_config['nick']+"@"+self.bot_config['nick']+".tmi.twitch.tv PRIVMSG #"+self.bot_config['chan']+" : "+msg+"\r\n"
@@ -1557,12 +1407,12 @@ class ChatBot(object):
         else:
             answermsg2 = answermsg.encode("utf-8")
         self.s.send(answermsg2)
-        
+
     def retrieve_messages(self):
         username, message, cleanmessage = None, None, None
         try:
             response = self.s.recv(1024).decode("utf-8")
-#            logging.debug("Response:\n%s" % response)
+            logging.debug("Response:\n%s" % response)
             if response == "PING :tmi.twitch.tv\r\n":
                 self.s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
                 logging.debug("Pong sent")
@@ -1573,7 +1423,7 @@ class ChatBot(object):
                 else:
                     message = re.compile(r"^:\w+!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :").sub("", response)
                     cleanmessage = re.sub(r"\s +", "", message, flags=re.UNICODE).replace("\n","").replace("\r","")
-                    
+
 #                    logging.debug("USER RESPONSE: " + username + " : " + message)
 #                    if cleanmessage in var.COMMANDLIST:
 #                        logging.debug("Command recognized.")
@@ -1581,13 +1431,15 @@ class ChatBot(object):
 #                        time.sleep(1)
         except: 
 #            logging.debug(traceback.print_exc())
-            
+
             pass
         return username, message, cleanmessage
-    
+
 def main():
-    main_window = MainWindow()
-    main_window.window.show()
-    main_window.app.exec_()
+    #main_window = MainWindow()
+    #main_window.window.show()
+    #main_window.app.exec_()
+    mainloop = MainLoop()
+    mainloop.connect()
 if __name__ == '__main__':
     main()
