@@ -1270,7 +1270,7 @@ class Question(object):
         counter = 0
         for i in prehint:
             if counter % 3 >= 0.7 and i != " ":
-                listo += "_"
+                listo += "·"
             else:
                 listo += i
             counter += 1
@@ -1278,7 +1278,7 @@ class Question(object):
             hint += hint.join(listo[i])
         self.hint_1 = hint
 
-        hint2 = re.sub('[aeiou]','_',prehint,flags=re.I)
+        hint2 = re.sub('[aeiou]','·',prehint,flags=re.I)
         self.hint_2 = hint2
     def check_actions(self):
         time_since_question_asked = (datetime.datetime.now() - self.question_time_start).seconds
