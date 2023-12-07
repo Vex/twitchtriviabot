@@ -75,7 +75,7 @@ class MainLoop():
             iternum = 0
             while self.tb.valid:
                 iternum += 1
-                if iternum % 300 == 0:
+                if iternum % 1200 == 0:
                     # only update once every second
                     self.update_console() 
                 self.tb.main_loop(command_line_mode = True)
@@ -288,7 +288,8 @@ class TriviaBot(object):
                                   '!loadsession':self.load_trivia_session,
                                   '!savesession':self.save_trivia_session}
 
-            self.commands_list = {'!score':self.check_active_session_score}
+            self.commands_list = {'!score':self.check_active_session_score,
+                                  '!scores':self.check_active_session_scores}
             self.admins = [i.strip() for i in self.trivia_config['admins'].split(",")]
 
             logging.debug("Finished setting up Trivia Bot.")
@@ -342,7 +343,7 @@ class TriviaBot(object):
         if self.valid:
             logging.debug("Passed trivia_config validation.")
             self.trivia_config = temp_config
-            
+
     def validate_auth_config(self,temp_config):
         for k, v in temp_config.items():
             if k == 'host':
@@ -391,6 +392,10 @@ class TriviaBot(object):
                         self.cb.send_message("Trivia has begun! Infinite question mode. Trivia will start in %s seconds." % (self.active_session.session_config['question_delay']))
                     else:
                         self.cb.send_message("Trivia has begun! Question Count: %s. Trivia will start in %s seconds." % (self.active_session.question_count, self.active_session.session_config['question_delay']))
+
+                    time.sleep(1)
+                    self.cb.send_message("Hints will occur after %s seconds and %s seconds." % (self.active_session.session_config['hint_time1'], self.active_session.session_config['hint_time2']))
+
                     time.sleep(self.active_session.session_config['question_delay'])
                     # get first question, ask, then begin loop
                     self.active_session.trivia_active = True
@@ -401,7 +406,7 @@ class TriviaBot(object):
                 logging.debug("Error on session %s" % traceback.print_exc())
         else:
             logging.debug("Trivia active - ignoring command to begin session.")
-            
+
     def save_trivia_session(self):
         '''
         dump trivia session to pickle file
@@ -471,7 +476,7 @@ class TriviaBot(object):
                     func(username)
                 else:
                     func()
-            
+
     def check_active_session_score(self, username):
         '''
         If there's an active session that has not yet been replaced (meaning, the last active 
@@ -486,16 +491,27 @@ class TriviaBot(object):
                 else:
                     self.cb.send_message("%s had no points in the last game." % (username))
 
-        
+    def check_active_session_scores(self):
+        '''
+        If there's an active session that has not yet been replaced (meaning, the last active 
+        session after a game is over), this will allow users to call their scores
+        '''
+        if self.active_session != None and not self.active_session.trivia_active:
+            user = self.active_session.check_user(username)
+            # anti spam measure
+            if user.validate_message_time():
+                self.active_session.check_top_scores()
+
+
     def handle_active_session(self):
         username, message, clean_message = self.cb.retrieve_messages()
-        
+
         self.handle_triviabot_message(username, clean_message)
         if message and username !='tmi':
             logging.debug(username)
             logging.debug(self.cb.bot_config['nick'])
             logging.debug("Message received:\n%s " % message)
-        self.active_session.check_actions()   
+        self.active_session.check_actions()
         if self.active_session.session_config['mode'] == 'poll' or self.active_session.session_config['mode'] == 'poll2':
             self.active_session.manage_poll_question()
         self.active_session.handle_session_message(username, clean_message)
@@ -714,19 +730,27 @@ class Session(object):
         self.ss = {}
         for i in chosen_idx:
             self.ss[i] = self.ts[i]
+
     def create_distributed_trivia_set(self):
-    
+
         # with open('temp.pickle','rb') as p:
         #     data = pickle.load(p)
-        
-        # determine how much to first sample the data 
+
+        # determine how much to first sample the data
         data = self.ts
         data_len = len(data)
-        question_count = self.session_config['question_count']
-        if question_count > data_len:
+
+        if self.session_config['length'] == 'infinite':
             question_count = data_len
+        else:
+            question_count = self.session_config['question_count']
+            if question_count > data_len:
+                question_count = data_len
+
         order = self.session_config['order']
-        
+
+        print("Trivia Set: %d, Question Count: %d " % (data_len, question_count))
+
         first_sample = 0
         if (question_count / data_len) < .3:
             first_sample = int(data_len / 3)
@@ -734,20 +758,19 @@ class Session(object):
             first_sample = int(data_len / 2)
         if first_sample < question_count:
            first_sample = question_count
-    
-    
-       
-        # print("LEN %s" % first_sample)
-    
-        data_set = {}        
+
+
+        print("LEN %s" % first_sample)
+
+        data_set = {}
         category_counts = {}
         # first initialize each category for 0 count
-        
+
         def report_mean(c):
             return float(sum(c.values()) / len(c.values())) + 1
-    
-            
-        # create first sampled set 
+
+
+        # create first sampled set
         data_set_sample1 = {}
         chosen_idx = random.sample(list(data.keys()), int(first_sample))
         # print("LEN 2 %s" % len(chosen_idx))
@@ -755,13 +778,12 @@ class Session(object):
             chosen_idx.sort()
         for i in chosen_idx:
             data_set_sample1[i] = data[i]
-        
-    
+
         for k, v in data_set_sample1.items():
             category_counts[v['category']] = 0
-            
+
         iter_num = 0
-        placed_num = 0 
+        placed_num = 0
         while iter_num < 10000 and placed_num < question_count:
             for k, v in data_set_sample1.items():
                 # get category_count
@@ -771,7 +793,7 @@ class Session(object):
                 flag_b = category_report == 0
                 # print("%s %s %s %s" % (category_report, reported_mean, flag_a, flag_b))
                 if flag_a or flag_b:
-                    # print("adding category %s" % v['category'])
+                    print("adding category %s" % v['category'])
                     if k not in data_set.keys():
                         data_set[k] = v
                         category_counts[v['category']] = category_counts[v['category']] + 1
@@ -784,30 +806,22 @@ class Session(object):
                 if iter_num >= 10000:
                     print("Break by iter_num")
                     break
-        # print("ITER %s PLACED %s" % (iter_num,placed_num))
+        print("ITER %s PLACED %s" % (iter_num,placed_num))
         # final shuffle
         data_set_final = {}
         data_set_keys = list(data_set.keys())
-        random.shuffle(data_set_keys) 
+        random.shuffle(data_set_keys)
         # data_set_keys = random.sample(data_set_keys,int(self.session_config['question_count']))
-        
+
         for i in data_set_keys:
             data_set_final[i] = data_set[i]
-      
 
-        
+
         self.ss = data_set_final
-        # print(len(data_set_final.keys()))
+        print(len(data_set_final.keys()))
         logging.debug("Category counts breakdown:")
         for k, v in category_counts.items():
             logging.debug("%s %s" % ("{:50}".format("%s:" % k), v))
-
-
-
-
-
-
-
 
 
 
@@ -922,8 +936,6 @@ class Session(object):
         except:
             logging.debug("Error on output session variables method (score txt files) %s" % traceback.print_exc())
 
-
-        
     def check_user(self,username):
         '''
         This checks the username and returns the User object that matches
@@ -937,13 +949,20 @@ class Session(object):
             new_user = User(username)
             self.users.append(new_user)
             return new_user
+
     def check_user_score(self, user, from_trivia_bot = False):
         if not from_trivia_bot:
             if user.validate_message_time():
                 self.cb.send_message("User %s has %s points." % (user.username, user.points))
         else:
             self.cb.send_message("User %s had %s points last game." % (user.username, user.points))
-        
+
+    def check_top_scores(self):
+        self.cb.send_message("Top scores in current game: ")
+        #for user in self.users:
+
+
+
     def check_top_3(self):
         user_dict = {}
         for u in self.users:
@@ -1004,20 +1023,25 @@ class Session(object):
     def call_hint1(self):
         try:
             if self.questionasked:
-                self.cb.send_message(self.active_question.hint_1)
+                self.cb.send_message("Hint 1: %s " % self.active_question.hint_1)
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
     def call_hint2(self):
         try:
             if self.questionasked:
-                self.cb.send_message(self.active_question.hint_2)
+                self.cb.send_message("Hint 2: %s " % self.active_question.hint_2)
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
 
-        
+
     def skip_question(self):
         try:
-            self.cb.send_message("Question being skipped. The answer was ** %s **." % self.active_question.answers[0])
+
+            ans = ''
+            if self.session_config['skip_show_answer']:
+                ans = "The answer was  ** %s **." % self.active_question.answers[0]
+
+            self.cb.send_message("Question being skipped. %s" % ans)
             self.active_question.active = False
             self.answered_questions.append(self.active_question)
             self.questionno += 1
@@ -1031,10 +1055,9 @@ class Session(object):
             else:
                 self.force_end_of_trivia()
 
-            
         except:
             logging.debug("Error on skip question %s" % traceback.print_exc())
-    
+
     def start_question(self):
         try:
             if not self.active_question.active:
@@ -1043,15 +1066,15 @@ class Session(object):
                 logging.debug("Question already active, ignoring Start Q command")
         except:
             logging.debug("Error on start question %s" % traceback.print_exc())
-        
+
     def end_question(self):
         try:
             self.active_question.question_time_start = datetime.datetime(1990,1,1)
 
-            
+
         except:
             logging.debug("Error on skip question %s" % traceback.print_exc())
-            
+
     def manage_poll_question(self):
         adjuster = datetime.timedelta(seconds = self.session_config['skip_time'])
         adj_time = self.active_question.question_time_start + adjuster
@@ -1063,15 +1086,18 @@ class Session(object):
             self.answered_questions.append(self.active_question)
             if self.active_question.point_dict:
                 first_user = list(self.active_question.point_dict.keys())[0]
-                for user in self.active_question.point_dict:                
+                for user in self.active_question.point_dict:
                     user.points += self.active_question.point_dict[user]
                 self.answered_questions.append(self.active_question)
                 self.cb.send_message(self.active_question.answer_string_poll(first_user, self.active_question.point_dict[first_user], self.questionno))
             else:
-                self.cb.send_message("Question not answered in time. The answer was ** %s **." % self.active_question.answers[0])
+                ans = ''
+                if self.session_config['skip_show_answer']:
+                    ans = "The answer was  ** %s **." % self.active_question.answers[0]
+                self.cb.send_message("Question not answered in time. %s" % ans)
 
             if self.active_question.session_config['mode'] == 'poll2':
-                
+
                 time.sleep(.25)
                 # first score second question
                 if self.active_question.point_dict2:
@@ -1270,7 +1296,7 @@ class Question(object):
         counter = 0
         for i in prehint:
             if counter % 3 >= 0.7 and i != " ":
-                listo += "·"
+                listo += "▯"
             else:
                 listo += i
             counter += 1
@@ -1278,7 +1304,7 @@ class Question(object):
             hint += hint.join(listo[i])
         self.hint_1 = hint
 
-        hint2 = re.sub('[aeiou]','·',prehint,flags=re.I)
+        hint2 = re.sub('[aeiou]','▯',prehint,flags=re.I)
         self.hint_2 = hint2
     def check_actions(self):
         time_since_question_asked = (datetime.datetime.now() - self.question_time_start).seconds
