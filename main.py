@@ -290,7 +290,9 @@ class TriviaBot(object):
 
             self.commands_list = {'!score':self.check_active_session_score,
                                   '!scores':self.check_active_session_scores,
-                                  '!flag':self.flag_current_question}
+                                  '!flag':self.flag_current_question,
+                                  '!stats':self.display_stats
+                                }
             self.admins = [i.strip() for i in self.trivia_config['admins'].split(",")]
 
             logging.debug("Finished setting up Trivia Bot.")
@@ -368,13 +370,11 @@ class TriviaBot(object):
                     self.error_msg = "Config error: Invalid channel name %s. Channel name should be text only with NO number sign" % v
                     logging.debug(self.error_msg)
                     self.valid = False
-            
-                    
 
         if self.valid:
             logging.debug("Passed auth_config validation.")
             self.auth_config = temp_config
-        
+
     def start_session(self, start_new_override=True):
         logging.debug("Starting session...")
         if not self.trivia_active:
@@ -433,7 +433,7 @@ class TriviaBot(object):
                     load_session = pickle.load(p)
                     load_session.cb = self.cb
                     self.active_session = load_session
-            
+
                 logging.debug("Latest trivia session loaded.")
                 self.cb.send_message("Latest trivia session loaded. Beginning trivia...")
             except:
@@ -447,7 +447,6 @@ class TriviaBot(object):
             else:
                 logging.debug("No trivia session loaded.")
 
-        
     def stop_bot(self):
         self.cb.send_message("Ending trivia bot. See you next trivia session!")
         self.valid = False
@@ -508,6 +507,17 @@ class TriviaBot(object):
     def flag_current_question(self, username):
         if self.active_session != None and self.active_session.trivia_active:
             logging.debug("Question %d: %s - flagged by user %s" % (self.active_session.questionno, self.active_session.active_question.question_string, username))
+
+    def display_stats(self):
+        if self.active_session != None and self.active_session.trivia_active:
+            stats = "Trivia Session: Active Questions: %d Asked: %d Answered: %d Players: %d" % ( len(self.active_session.questions),
+                                                                        int(self.active_session.questionno),
+                                                                        len(self.active_session.answered_questions),
+                                                                        len(self.active_session.users) )
+        else:
+            stats = "Trivia Session: Inactive"
+
+        self.cb.send_message(stats)
 
     def handle_active_session(self):
         username, message, clean_message = self.cb.retrieve_messages()
@@ -1318,11 +1328,15 @@ class Question(object):
 
         if hint != prehint:
             self.hint_1 = hint
+        else:
+            self.hint_1 = ''
 
         hint2 = re.sub('[aeiou]','▯',prehint,flags=re.I)
 
         if hint2 != prehint:
             self.hint_2 = hint2
+        else:
+            self.hint_2 = ''
 
     def check_actions(self):
         time_since_question_asked = (datetime.datetime.now() - self.question_time_start).seconds
