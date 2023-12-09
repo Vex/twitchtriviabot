@@ -289,7 +289,8 @@ class TriviaBot(object):
                                   '!savesession':self.save_trivia_session}
 
             self.commands_list = {'!score':self.check_active_session_score,
-                                  '!scores':self.check_active_session_scores}
+                                  '!scores':self.check_active_session_scores,
+                                  '!flag':self.flag_current_question}
             self.admins = [i.strip() for i in self.trivia_config['admins'].split(",")]
 
             logging.debug("Finished setting up Trivia Bot.")
@@ -455,6 +456,8 @@ class TriviaBot(object):
             self.active_session.trivia_active = False
         except:
             pass
+
+
     def handle_triviabot_message(self,username, message):
         '''
         This is the main function that decides what to do based on the latest message that came in
@@ -472,7 +475,7 @@ class TriviaBot(object):
 
             if message in self.commands_list.keys():
                 func = self.commands_list[message]
-                if message == '!score':
+                if message == '!score' or message == '!flag':
                     func(username)
                 else:
                     func()
@@ -502,6 +505,9 @@ class TriviaBot(object):
             if user.validate_message_time():
                 self.active_session.check_top_scores()
 
+    def flag_current_question(self, username):
+        if self.active_session != None and self.active_session.trivia_active:
+            logging.debug("Question %d: %s - flagged by user %s" % (self.active_session.questionno, self.active_session.active_question.question_string, username))
 
     def handle_active_session(self):
         username, message, clean_message = self.cb.retrieve_messages()
@@ -620,7 +626,9 @@ class Session(object):
                                     '!endquestion':self.end_question,
                                     '!next':self.skip_question,
                                     '!bonus':self.toggle_bonus_mode}
-        self.commands_list       = {'!score':self.check_user_score}
+        self.commands_list       = {'!score':self.check_user_score,
+                                    '!scores':self.check_top_scores}
+#                                    '!flag':self.flag_current_question}
         self.session_actions = {'hint1':self.call_hint1,
                                 'hint2':self.call_hint2,
                                 'skip':self.skip_question}
@@ -1022,13 +1030,13 @@ class Session(object):
 
     def call_hint1(self):
         try:
-            if self.questionasked:
+            if self.questionasked and self.active_question.hint_1:
                 self.cb.send_message("Hint 1: %s " % self.active_question.hint_1)
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
     def call_hint2(self):
         try:
-            if self.questionasked:
+            if self.questionasked and self.active_question.hint_2:
                 self.cb.send_message("Hint 2: %s " % self.active_question.hint_2)
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
@@ -1179,7 +1187,11 @@ class Session(object):
                 func()
             if message in self.commands_list:
                 func = self.commands_list[message]
-                func(user)
+
+                if message == '!score' or message == '!flag':
+                    func(user)
+                else:
+                    func()
 
             # trivia active
             if self.trivia_active:
@@ -1234,21 +1246,22 @@ class Question(object):
         self.skipped = False
         self.answered_user_list =[] # this is an ordered list used for polling multiple answers as they come in
         self.answered_user_list2 =[] # same, but for 2nd during 'poll2' mode
-        
+
     def activate_question(self, bonus_flag, bonus_amount):
         self.active = True
         self.question_time_start = datetime.datetime.now() # datetime object
         if bonus_flag:
             self.point_value = bonus_amount
-    
+
     def __str__(self):
         return "{:<10}".format("Category:") + str(self.category) + "\n" +\
                 "{:<10}".format("Question:") + str(self.question) + "\n" +\
-                "{:<10}".format("Answers:") + str(self.answers)
-                
+                "{:<10}".format("Answers:") + str(self.answers) + "\n" +\
+                "{:<10}".format("Hints:") + str(self.hint_1) + " - " + str(self.hint_2)
+
     def check_match(self, cleanmessage, mode=None):
         if self.session_config['mode'] != 'poll2':
-            try:                
+            try:
                 for answer in self.answers:
                     if bool(re.match("\\b%s\\b" % answer,cleanmessage,re.IGNORECASE)):   # strict new matching
                         logging.debug("Answer recognized: %s" % answer)
@@ -1302,10 +1315,15 @@ class Question(object):
             counter += 1
         for i in range(len(listo)):
             hint += hint.join(listo[i])
-        self.hint_1 = hint
+
+        if hint != prehint:
+            self.hint_1 = hint
 
         hint2 = re.sub('[aeiou]','▯',prehint,flags=re.I)
-        self.hint_2 = hint2
+
+        if hint2 != prehint:
+            self.hint_2 = hint2
+
     def check_actions(self):
         time_since_question_asked = (datetime.datetime.now() - self.question_time_start).seconds
         
@@ -1433,6 +1451,7 @@ class ChatBot(object):
         else:
             answermsg2 = answermsg.encode("utf-8")
         self.s.send(answermsg2)
+        logging.debug("Sending msg: %s" % answermsg2)
 
     def retrieve_messages(self):
         username, message, cleanmessage = None, None, None

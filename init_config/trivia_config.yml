@@ -3,6 +3,7 @@ question_count: 300
 hint_time1: 20
 hint_time2: 40
 skip_time: 60
+skip_show_answer: true
 question_delay: 15
 question_bonusvalue: 3
 mode: single
