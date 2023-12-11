@@ -12,3 +12,4 @@ __pycache__/*
 .git/*
 notes.txt
 releases/*
+*.pyc
