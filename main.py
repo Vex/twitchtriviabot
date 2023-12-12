@@ -1023,19 +1023,19 @@ class Session(object):
             return True
         else:
             return False
-        
+
     def find_winner(self):
         top_score = 0
         for user in self.users:
             if user.points > top_score:
                 top_score = user.points
-                
+
         # now check if there's more than 1 winner
         winners = [user for user in self.users if user.points == top_score]
-        
+
         if not winners or top_score == 0:
             winners = None
-        
+
         self.winners = winners
 
     def call_hint1(self):
@@ -1131,13 +1131,13 @@ class Session(object):
                     self.cb.send_message("2nd category question not answered in time. The answer was ** %s **." % self.active_question.answers[1])
 
                 # then bonus points for both
-                
+
                 bonus_users = []
                 for user in self.active_question.point_dict.keys():
                     if user in self.active_question.point_dict2.keys():
                         bonus_users.append(user)
                         user.points += 2
-                
+
                 if bonus_users:
                     time.sleep(.25)
                     if len(bonus_users) > 3:
@@ -1145,12 +1145,11 @@ class Session(object):
                     else:
                         self.cb.send_message("%s answered both prompts correctly, yielding +2 bonus points!" % ', '.join([user.username]))
             self.questionno += 1
-            self.questionasked = False            
-    
-            # if music_mode is True, then do nothing after a question is answered 
+            self.questionasked = False
+
+            # if music_mode is True, then do nothing after a question is answered
             if self.session_config['music_mode']:
-                pass                
-            
+                pass
             else:
                 time.sleep(self.session_config['question_delay'])
                 if self.questionno < self.question_count + 1:
@@ -1171,6 +1170,7 @@ class Session(object):
                     func()
         except:
             logging.debug("Error on check_actions: %s" % traceback.print_exc())
+
     def toggle_bonus_mode(self):
         if self.bonus_round:
             self.bonus_round = False
@@ -1180,6 +1180,7 @@ class Session(object):
             self.bonus_round = True
             self.active_question.point_value = int(self.session_config['question_bonusvalue'])
             self.cb.send_message("Bonus round is active! Bonus questions are worth ** %s ** points!" % (self.session_config['question_bonusvalue']))
+
     def handle_session_message(self,username, message):
         '''
         This is the main function that decides what to do based on the latest message that came in
@@ -1188,7 +1189,7 @@ class Session(object):
         self.check_end_of_trivia()
         if message:
             logging.debug("Session vars trivia_active: %s questionasked: %s" % (self.trivia_active, self.questionasked))
-            
+
             user = self.check_user(username)
 
             # handle commands first
@@ -1297,7 +1298,6 @@ class Question(object):
             
     def answer_string(self,user, trivia_num):
         return "%s answers question #%s correctly! The answer is ** %s ** with a %s point value. %s has %s points!" % (user.username, trivia_num ,self.answers[0], self.point_value, user.username, user.points)
-    # "PETSHOP %s answers question #%s correctly! The answer is ** %s ** with a %s point value. %s has %s points!" % (user.username, trivia_num ,self.answers[0], self.point_value, user.username, user.points)
 
     def answer_string_poll(self,user, point_val, trivia_num):
         if self.answered_user_list_remaining:
@@ -1434,38 +1434,47 @@ class ChatBot(object):
         try:
             self.valid = True
             self.bot_config = auth_config
-            try:
-                self.s = socket.socket()
-                self.s.connect((self.bot_config['host'], self.bot_config['port']))
-                self.s.send("PASS {}\r\n".format(self.bot_config['pass']).encode("utf-8"))
-                self.s.send("NICK {}\r\n".format(self.bot_config['nick']).encode("utf-8"))
-                self.s.send("JOIN #{}\r\n".format(self.bot_config['chan']).encode("utf-8"))
-                time.sleep(1)
-                self.send_message(self.infomessage)
-                self.s.setblocking(0)
-            except:
-                self.s = socket.socket()
-                self.s.connect((self.bot_config['host'], self.bot_config['port']))
-                self.s.send("PASS {}\r\n".format(self.bot_config['pass']).encode("utf-8"))
-                self.s.send("NICK {}\r\n".format(self.bot_config['nick']).encode("utf-8"))
-                self.s.send("JOIN #{}\r\n".format(self.bot_config['chan'].lower()).encode("utf-8"))
-                time.sleep(1)
-                self.send_message(self.infomessage)
-                self.s.setblocking(0)
+
+            self.connect()
+
         except Exception as e:
             logging.debug("Connection failed. Check config settings and reload bot.\nError code:\n%s" % str(e))
             self.valid = False
         logging.debug("Finished setting up Chat Bot.")
 
+    def connect(self):
+        try:
+            self.s = socket.socket()
+            self.s.connect((self.bot_config['host'], self.bot_config['port']))
+            self.s.send("PASS {}\r\n".format(self.bot_config['pass']).encode("utf-8"))
+            self.s.send("NICK {}\r\n".format(self.bot_config['nick']).encode("utf-8"))
+            self.s.send("JOIN #{}\r\n".format(self.bot_config['chan']).encode("utf-8"))
+            time.sleep(1)
+            self.send_message(self.infomessage)
+            self.s.setblocking(0)
+        except:
+            self.s = socket.socket()
+            self.s.connect((self.bot_config['host'], self.bot_config['port']))
+            self.s.send("PASS {}\r\n".format(self.bot_config['pass']).encode("utf-8"))
+            self.s.send("NICK {}\r\n".format(self.bot_config['nick']).encode("utf-8"))
+            self.s.send("JOIN #{}\r\n".format(self.bot_config['chan'].lower()).encode("utf-8"))
+            time.sleep(1)
+            self.send_message(self.infomessage)
+            self.s.setblocking(0)
+
+
     ### Chat message sender func
     def send_message(self, msg):
-        answermsg = ":"+self.bot_config['nick']+"!"+self.bot_config['nick']+"@"+self.bot_config['nick']+".tmi.twitch.tv PRIVMSG #"+self.bot_config['chan']+" : "+msg+"\r\n"
+        sendmsg = ":"+self.bot_config['nick']+"!"+self.bot_config['nick']+"@"+self.bot_config['nick']+".tmi.twitch.tv PRIVMSG #"+self.bot_config['chan']+" : "+msg+"\r\n"
         if 'iso' in self.bot_config['encoding'].lower():
-            answermsg2 = answermsg.encode(self.bot_config['encoding'])
+            sendmsg2 = sendmsg.encode(self.bot_config['encoding'])
         else:
-            answermsg2 = answermsg.encode("utf-8")
-        self.s.send(answermsg2)
-        logging.debug("Sending msg: %s" % answermsg2)
+            sendmsg2 = sendmsg.encode("utf-8")
+        try:
+            self.s.send(sendmsg2)
+            logging.debug("Sending msg: %s" % sendmsg2)
+        except BrokenPipeError:
+            self.connect()
 
     def retrieve_messages(self):
         username, message, cleanmessage = None, None, None
