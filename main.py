@@ -543,7 +543,7 @@ class TriviaBot(object):
             iternum = 0
             while self.valid:
                 iternum += 1
-                if iternum % 300 == 0:
+                if iternum % 1200 == 0:
                     try:
                         logging.debug("Iternum %s : trivia_active %s active_session.trivia_active %s" % (iternum, self.trivia_active, self.active_session.trivia_active))
                     except:
@@ -976,10 +976,7 @@ class Session(object):
             self.cb.send_message("User %s had %s points last game." % (user.username, user.points))
 
     def check_top_scores(self):
-        self.cb.send_message("Top scores in current game: ")
-        #for user in self.users:
-
-
+        self.cb.send_message("Top scores in current game: %s" % self.check_top_3())
 
     def check_top_3(self):
         user_dict = {}
@@ -1473,7 +1470,8 @@ class ChatBot(object):
         try:
             self.s.send(sendmsg2)
             logging.debug("Sending msg: %s" % sendmsg2)
-        except BrokenPipeError:
+        except (BrokenPipeError, TimeoutError):
+            time.sleep(1)
             self.connect()
 
     def retrieve_messages(self):
