@@ -128,7 +128,7 @@ class MainWindow(QWidget):
                 self.question_label.setVisible(True)
                 self.answer_label.setVisible(True)
                 self.top3_label.setVisible(True)
-                self.top3_variable_text.setText(self.tb.active_session.check_top_3())
+                self.top3_variable_text.setText(self.tb.active_session.check_top(3))
                 if str(self.tb.active_session.session_config['music_mode']) == 'true' or self.tb.active_session.session_config['music_mode'] == True:
                     self.trivia_startq_button.setVisible(True)
                 else:
@@ -698,15 +698,14 @@ class Session(object):
                     for i in valid_keys:
                         new_ts[i] = self.ts[i]
                     self.ts = new_ts
-                
+
                 self.tsrows = len(self.ts.keys())
-                
-                
+
+
                 if self.tsrows < self.session_config['question_count']:
                     self.session_config['question_count'] = int(self.tsrows)
                     logging.debug("Warning: Trivia questions for session exceeds trivia set's population. Setting session equal to max questions.")
-    
-    
+
                 logging.debug("Creating session set data. Population %s, session %s" % (self.tsrows, self.session_config['question_count']))
 
                 if self.session_config['category_distribution'] == 'random':
@@ -714,7 +713,7 @@ class Session(object):
                 elif self.session_config['category_distribution'] == 'distributed':
                     self.create_distributed_trivia_set()
                 try:
-    
+
                     for k, v in self.ss.items():
                         try:
                             self.questions.append(Question(v, self.session_config))
@@ -726,15 +725,12 @@ class Session(object):
                     self.question_count = 999999
                 else:
                     self.question_count = len(self.questions)
-    
-                
+
                 logging.debug("Finished setting up Session.")
-                
+
         except Exception as e:
             logging.debug("Error on data load. Check trivia set and make sure file_name matches in config, and that file matches columns/headers correctly\nError code:\n>> %s" % e)
             self.valid = False
-                
-    
 
         if str(self.session_config['output']).lower() == 'true' or self.session_config['output'] == True:
             for i in ['1_place_username','1_place_score','2_place_username','2_place_score','3_place_username','3_place_score','scoreboard']:
@@ -866,8 +862,7 @@ class Session(object):
             except Exception as e:
                 logging.debug("Error on calling next question, ending trivia...%s" % str(e))
                 self.force_end_of_trivia()
-            
-        else:        
+        else:
             try:
                 self.active_question = self.questions.pop()
                 if self.session_config['length'] == 'infinite':
@@ -900,7 +895,6 @@ class Session(object):
             else:
                 self.force_end_of_trivia()
 
-            
         elif self.session_config['mode'] == 'poll':
             if user not in self.active_question.answered_user_list:
                 self.active_question.answered_user_list.append(user)
@@ -913,23 +907,26 @@ class Session(object):
                     self.active_question.answered_user_list2.append(user)
         if str(self.session_config['output']).lower() == 'true' or self.session_config['output'] == True:
             self.output_session_variables()
-            
+
         self.clear_question_variable()
-            
+
+
     def write_question_variable(self):
         try:
             with open(os.path.join(THIS_FILEPATH,'config','scores','question.txt'),'w') as f:
-                f.write(self.active_question.question_string)        
+                f.write(self.active_question.question_string)
         except:
             logging.error("Error on write question to file")
+
 
     def clear_question_variable(self):
         try:
             with open(os.path.join(THIS_FILEPATH,'config','scores','question.txt'),'w') as f:
-                f.write("")      
+                f.write("")
         except:
             logging.error("Error on write question to file")
-            
+
+
     def output_session_variables(self):
         try:
             user_dict = {}
@@ -943,7 +940,7 @@ class Session(object):
                         f.write(str(i[0]))
                     with open(os.path.join(THIS_FILEPATH,'config','scores','%s_place_score.txt' % (int(idx) + 1)),'w') as f:
                         f.write(str(i[1]))
-            
+
                 return_str = ''
                 for k, v in user_dict.items():
                     return_str += '%s: %s\n' % (k,v)
@@ -975,27 +972,30 @@ class Session(object):
         else:
             self.cb.send_message("User %s had %s points last game." % (user.username, user.points))
 
-    def check_top_scores(self):
-        self.cb.send_message("Top scores in current game: %s" % self.check_top_3())
 
-    def check_top_3(self):
+    def check_top_scores(self):
+        self.cb.send_message("Top scores in current game: %s" % self.check_top(5))
+
+
+    def check_top(self, num = 3):
         user_dict = {}
         for u in self.users:
             user_dict[u.username] = u.points
         if user_dict:
             k = Counter(user_dict)
-            top3 = k.most_common(3)
+            top = k.most_common(num)
             return_str = ''
-            for i in top3:
-                return_str += '%s: %s\n' % (i[0], i[1])
+            for i in top:
+                return_str += '%s: %s ' % (i[0], i[1])
             return return_str
         else:
-            return "No users"
-        
+            return "No users playing"
 
-        
+
     def force_end_of_trivia(self):
         self.check_end_of_trivia(end_trivia_flag=True)
+
+
     def check_end_of_trivia(self, end_trivia_flag = False):
         if (self.questionno > self.question_count and self.trivia_active) or end_trivia_flag:
             self.write_question_variable()
