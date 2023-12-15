@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 @author: cleartonic
+@author: vex
 """
 import random
 import csv
@@ -22,7 +23,7 @@ THIS_FILEPATH = os.path.dirname( __file__ )
 THIS_FILENAME = os.path.basename(__file__)
 
 
-try:    
+try:
     logging.basicConfig(format='%(asctime)s %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p',
                     filename=os.path.join(THIS_FILEPATH,'config','output_log.log'),
@@ -36,9 +37,9 @@ except:
                     filename=os.path.join(THIS_FILEPATH,'config','output_log.log'),
                     filemode='a',
                     level=logging.DEBUG)
-        
 
-VERSION_NUM = "2.2.2"
+
+VERSION_NUM = "2.2.3"
 # INFO_MESSAGE = 'Twitch Trivia Bot loaded. Version %s. Developed by cleartonic. %s' % (VERSION_NUM, random.randint(0,10000))
 INFO_MESSAGE = 'Twitch Trivia Bot loaded.'
 
@@ -294,6 +295,7 @@ class TriviaBot(object):
                                   '!stats':self.display_stats
                                 }
             self.admins = [i.strip() for i in self.trivia_config['admins'].split(",")]
+            self.ignore_users = [i.strip() for i in self.trivia_config['ignore_users'].split(",")]
 
             logging.debug("Finished setting up Trivia Bot.")
         else:
@@ -523,7 +525,7 @@ class TriviaBot(object):
         username, message, clean_message = self.cb.retrieve_messages()
 
         self.handle_triviabot_message(username, clean_message)
-        if message and username !='tmi':
+        if message and username !='tmi' and username not in self.ignore_users:
             logging.debug(username)
             logging.debug(self.cb.bot_config['nick'])
             logging.debug("Message received:\n%s " % message)
@@ -554,7 +556,7 @@ class TriviaBot(object):
                 else:
                     username, message, clean_message = self.cb.retrieve_messages()
 
-                    if message and username !='tmi':
+                    if message and username !='tmi' and username not in self.ignore_users:
                         logging.debug(username)
                         logging.debug(self.cb.bot_config['nick'])
                         logging.debug("Message received:\n%s " % message)
@@ -650,6 +652,7 @@ class Session(object):
         logging.debug("Loading config...")
         self.session_config = trivia_config
         self.admins = [i.strip() for i in trivia_config['admins'].split(",")]
+        self.ignore_users = [i.strip() for i in trivia_config['ignore_users'].split(",")]
         out_str = ''
         for k, v in self.session_config.items():
             out_str += "   " + "{:<20}".format(k)+ " " + str(v) + "\n"
@@ -1187,31 +1190,37 @@ class Session(object):
         if message:
             logging.debug("Session vars trivia_active: %s questionasked: %s" % (self.trivia_active, self.questionasked))
 
-            user = self.check_user(username)
 
             # handle commands first
-            if message in self.admin_commands_list.keys() and user.username in self.admins:
+            if message in self.admin_commands_list.keys() and username in self.admins:
                 func = self.admin_commands_list[message]
                 func()
-            if message in self.commands_list:
-                func = self.commands_list[message]
 
-                if message == '!score' or message == '!flag':
-                    func(user)
-                else:
-                    func()
 
-            # trivia active
-            if self.trivia_active:
-                if self.questionasked:                    
-                    if self.session_config['mode'] == 'poll2':
-                        match, answer_slot = self.active_question.check_match(message)
-                        if match:
-                            self.question_answered(user, answer_slot)                  
+            if username not in self.ignore_users:
+
+                user = self.check_user(username)
+
+                if message in self.commands_list:
+                    func = self.commands_list[message]
+
+                    if message == '!score' or message == '!flag':
+                        func(user)
                     else:
-                        match = self.active_question.check_match(message)
-                        if match:
-                            self.question_answered(user)
+                        func()
+
+                # trivia active
+                if self.trivia_active:
+                    if self.questionasked:
+                        if self.session_config['mode'] == 'poll2':
+                            match, answer_slot = self.active_question.check_match(message)
+                            if match:
+                                self.question_answered(user, answer_slot)
+                        else:
+                            match = self.active_question.check_match(message)
+                            if match:
+                                self.question_answered(user)
+
         else:
             return None
 
