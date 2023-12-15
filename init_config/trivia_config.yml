@@ -12,5 +12,6 @@ order: random
 category_distribution: distributed
 length: finite
 admins: 
+ignore_users: 
 output: true
 csv_encoding: utf-8
