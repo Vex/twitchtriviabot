@@ -639,8 +639,8 @@ class Session(object):
                                     '!next':self.skip_question,
                                     '!bonus':self.toggle_bonus_mode}
         self.commands_list       = {'!score':self.check_user_score,
-                                    '!scores':self.check_top_scores}
-#                                    '!flag':self.flag_current_question}
+                                    '!scores':self.check_top_scores,
+                                    '!flag':self.flag_current_question}
         self.session_actions = {'hint1':self.call_hint1,
                                 'hint2':self.call_hint2,
                                 'skip':self.skip_question}
@@ -841,14 +841,20 @@ class Session(object):
             logging.debug("%s %s" % ("{:50}".format("%s:" % k), v))
 
 
+    def flag_current_question(self, user):
+
+        logging.debug("Call tb flag")
+        return self.tb.flag_current_question(self, user)
 
     def call_current_time(self):
         return datetime.datetime.now()
+
     def report_question_numbers(self):
         if self.session_config['length'] == 'infinite':
             return "%s / %s" % (self.questionno, "inf")
         else:
             return "%s / %s" % (self.questionno, self.question_count)
+
     def call_question(self):
         if self.session_config['music_mode']:
             try:
@@ -1041,13 +1047,13 @@ class Session(object):
     def call_hint1(self):
         try:
             if self.questionasked and self.active_question.hint_1:
-                self.cb.send_message("Hint 1: %s " % self.active_question.hint_1)
+                self.cb.send_message("Hint: %s " % self.active_question.hint_1)
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
     def call_hint2(self):
         try:
             if self.questionasked and self.active_question.hint_2:
-                self.cb.send_message("Hint 2: %s " % self.active_question.hint_2)
+                self.cb.send_message("Hint: %s " % self.active_question.hint_2)
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
 
@@ -1121,7 +1127,7 @@ class Session(object):
                 if self.active_question.point_dict2:
                     try:
                         first_user = list(self.active_question.point_dict2.keys())[0]
-                        for user in self.active_question.point_dict2:                
+                        for user in self.active_question.point_dict2:
                             user.points += self.active_question.point_dict2[user]
                         time.sleep(.5)
                         self.cb.send_message(self.active_question.answer_string_poll2(first_user, self.active_question.point_dict2[first_user], self.questionno))
@@ -1237,13 +1243,13 @@ class Question(object):
         if music_mode:
             self.question = "Listen to audio..."
             self.answers = [row[0],row[1]]
-            self.answers = [i for i in self.answers if i != '']            
+            self.answers = [i for i in self.answers if i != '']
             self.category = "Music"
             self.creator = ''
         else:
             self.question = str(row['question'][0]).upper() + row['question'][1:]
             self.answers = [row['answer'],row['answer2'],row['answer3'],row['answer4'],row['answer5']]
-            self.answers = [i for i in self.answers if i != '']
+            self.answers = [i for i in self.answers if i != '' and i is not None]
             self.answers = [i for i in self.answers if i == i]
             self.category = row['category']
             if 'category' in row:
@@ -1278,6 +1284,8 @@ class Question(object):
 
     def check_match(self, cleanmessage, mode=None):
         if self.session_config['mode'] != 'poll2':
+            logging.debug("Checking %s against answers: %s" % (cleanmessage, self.answers))
+
             try:
                 for answer in self.answers:
                     if bool(re.match("\\b%s\\b" % answer,cleanmessage,re.IGNORECASE)):   # strict new matching
@@ -1287,10 +1295,10 @@ class Question(object):
             except:
                 logging.debug("No match on %s to %s" % (cleanmessage, answer))
                 return False
-            
+
         else:
-            # for poll2, we check each answer for a match and return 
-            try:                
+            # for poll2, we check each answer for a match and return
+            try:
                 if bool(re.match("\\b%s\\b" % self.answers[0],cleanmessage,re.IGNORECASE)):   # strict new matching
                     logging.debug("Answer recognized: %s" % self.answers[0])
                     return True, 1 # answer_slot 1
@@ -1301,7 +1309,7 @@ class Question(object):
             except:
                 logging.debug("Try/except error, no match on %s to %s" % (cleanmessage, answer))
                 return False, None
-            
+
     def answer_string(self,user, trivia_num):
         return "%s answers question #%s correctly! The answer is ** %s ** with a %s point value. %s has %s points!" % (user.username, trivia_num ,self.answers[0], self.point_value, user.username, user.points)
 
@@ -1346,20 +1354,20 @@ class Question(object):
 
     def check_actions(self):
         time_since_question_asked = (datetime.datetime.now() - self.question_time_start).seconds
-        
+
         if (time_since_question_asked >= self.session_config['hint_time1']) and not self.hint1_asked:
             self.hint1_asked = True
             return 'hint1'
-        
+
         elif (time_since_question_asked >= self.session_config['hint_time2']) and not self.hint2_asked:
             self.hint2_asked = True
             return 'hint2'
-        
+
         elif (time_since_question_asked >= self.session_config['skip_time']) and not self.skipped and self.session_config['mode'] == 'single':
             # do not skip on mode 'poll', other process handles
             self.skipped = True
             return 'skip'
-                
+
         else:
             return None
     def find_poll_score(self):
