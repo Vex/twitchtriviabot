@@ -467,19 +467,32 @@ class TriviaBot(object):
         if message:
 #            user = self.check_user(username) ########## TO DO
 
-            if message in self.admin_commands_list.keys() and username in self.admins:
-                func = self.admin_commands_list[message]
-                if message == '!score':
-                    func(username)
-                else:
-                    func()
+            # Split out the message into "<COMMAND> <ARGS>", assume a command starts the message, and all commands that we respond to starte with !
+            words = message.split()
 
-            if message in self.commands_list.keys():
-                func = self.commands_list[message]
-                if message == '!score' or message == '!flag':
-                    func(username)
-                else:
-                    func()
+            if words[0].startswith('!'):
+                # Potential command
+                cmd = words[0]
+                msg = " ".join(words[1:])
+
+                #print("Command %s message %s" % (cmd, msg))
+
+                if cmd in self.admin_commands_list.keys() and username in self.admins:
+                    func = self.admin_commands_list[cmd]
+
+                    if cmd == '!score':
+                        func(username)
+                    else:
+                        func()
+
+                if cmd in self.commands_list.keys():
+                    func = self.commands_list[cmd]
+                    if cmd == '!flag':
+                        func(username, msg)
+                    elif cmd == '!score':
+                        func(username)
+                    else:
+                        func()
 
     def check_active_session_score(self, username):
         '''
@@ -506,9 +519,9 @@ class TriviaBot(object):
             if user.validate_message_time():
                 self.active_session.check_top_scores()
 
-    def flag_current_question(self, username):
+    def flag_current_question(self, username, msg):
         if self.active_session != None and self.active_session.trivia_active:
-            logging.debug("Question %d: %s - flagged by user %s" % (self.active_session.questionno, self.active_session.active_question.question_string, username))
+            logging.debug("Question %d: %s - flagged by user %s comment: %s" % (self.active_session.questionno, self.active_session.active_question.question_string, username, msg))
 
     def display_stats(self):
         if self.active_session != None and self.active_session.trivia_active:
@@ -842,9 +855,10 @@ class Session(object):
 
 
     def flag_current_question(self, user):
-
-        logging.debug("Call tb flag")
-        return self.tb.flag_current_question(self, user)
+        try:
+            return self.cb.flag_current_question(self, user)
+        except:
+            pass
 
     def call_current_time(self):
         return datetime.datetime.now()
@@ -1284,7 +1298,7 @@ class Question(object):
 
     def check_match(self, cleanmessage, mode=None):
         if self.session_config['mode'] != 'poll2':
-            logging.debug("Checking %s against answers: %s" % (cleanmessage, self.answers))
+            #logging.debug("Checking %s against answers: %s" % (cleanmessage, self.answers))
 
             try:
                 for answer in self.answers:
@@ -1373,7 +1387,7 @@ class Question(object):
     def find_poll_score(self):
         '''
         for 'poll'/'poll2' mode, this takes the answered_user_list and translates into points
-        
+
         first gets n + 2 points
         second gets n + 1 points
         all others get n points
@@ -1400,8 +1414,8 @@ class Question(object):
                 pass
         except:
             logging.debug("Error on find_poll_score: %s" % traceback.print_exc())
-            
-            
+
+
         # do additional scoring if mode is poll2
         if self.session_config['mode'] == 'poll2':
             self.point_dict2 = {}
@@ -1424,7 +1438,8 @@ class Question(object):
                     pass
             except:
                 logging.debug("Error on find_poll_score: %s" % traceback.print_exc())
-                     
+
+
 class User(object):
     def __init__(self,username):
         self.points = 0
