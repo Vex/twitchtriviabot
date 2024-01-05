@@ -521,7 +521,7 @@ class TriviaBot(object):
 
     def flag_current_question(self, username, msg):
         if self.active_session != None and self.active_session.trivia_active:
-            logging.debug("Question %d: %s - flagged by user %s comment: %s" % (self.active_session.questionno, self.active_session.active_question.question_string, username, msg))
+            logging.debug("Q#%d: %s - flagged by user %s comment: %s" % (self.active_session.questionno, self.active_session.active_question.question_string, username, msg))
 
     def display_stats(self):
         if self.active_session != None and self.active_session.trivia_active:
@@ -893,7 +893,7 @@ class Session(object):
                     self.questions = [self.active_question] + self.questions
                 self.active_question.activate_question(self.bonus_round, int(self.session_config['question_bonusvalue']))
                 self.questionasked = True
-                self.cb.send_message("Question %s: %s" % (self.questionno, self.active_question.question_string))
+                self.cb.send_message("Q#%s: %s" % (self.questionno, self.active_question.question_string))
                 logging.debug(self.active_question)
             except:
                 logging.debug("Error on calling next question, ending trivia...")
@@ -1298,11 +1298,12 @@ class Question(object):
 
     def check_match(self, cleanmessage, mode=None):
         if self.session_config['mode'] != 'poll2':
-            #logging.debug("Checking %s against answers: %s" % (cleanmessage, self.answers))
 
             try:
                 for answer in self.answers:
-                    if bool(re.match("\\b%s\\b" % answer,cleanmessage,re.IGNORECASE)):   # strict new matching
+                    #logging.debug("Checking user response %s against stored answer: %s" % (cleanmessage, re.escape(answer)))
+                    # Match answer, allow trailing comments
+                    if bool(re.match(r"\b%s(\b|$)*" % re.escape(answer), cleanmessage, re.IGNORECASE)):
                         logging.debug("Answer recognized: %s" % answer)
                         return True
                 return False
