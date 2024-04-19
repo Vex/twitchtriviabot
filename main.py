@@ -13,6 +13,9 @@ import pickle
 import socket
 import re, logging, sys
 import os
+import sqlite3
+import pprint
+
 from collections import Counter 
 
 # try:
@@ -39,23 +42,16 @@ except:
                     level=logging.DEBUG)
 
 
-VERSION_NUM = "2.2.3"
-# INFO_MESSAGE = 'Twitch Trivia Bot loaded. Version %s. Developed by cleartonic. %s' % (VERSION_NUM, random.randint(0,10000))
-INFO_MESSAGE = 'Twitch Trivia Bot loaded.'
+VERSION_NUM = "3.0.1"
+INFO_MESSAGE = 'Twitch Trivia Bot loaded. Version %s. Originally developed by cleartonic. Updated and re-imagined by Vex667' % (VERSION_NUM)
 
 if not os.path.exists(os.path.abspath(os.path.join(THIS_FILEPATH,'config'))):
     os.makedirs(os.path.abspath(os.path.join(THIS_FILEPATH,'config')))
 if not os.path.exists(os.path.abspath(os.path.join(THIS_FILEPATH,'config','scores'))):
     os.makedirs(os.path.abspath(os.path.join(THIS_FILEPATH,'config','scores')))
-if not os.path.exists(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music'))):
-    os.makedirs(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music')))
-
-    with open(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music','track.txt')),'w') as f:
-        f.write('Null track')
-    with open(os.path.abspath(os.path.join(THIS_FILEPATH,'config','music','artist.txt')),'w') as f:
-        f.write('Null artist')
 
 class MainLoop():
+
 
     def __init__(self):
         self.connection_active = False
@@ -68,7 +64,7 @@ class MainLoop():
 
 
     def connect(self):
-        self.tb = TriviaBot()  
+        self.tb = TriviaBot()
         if self.tb.valid:
             #self.connect_button.setText("Disconnect")
             self.connection_active = True
@@ -78,7 +74,7 @@ class MainLoop():
                 iternum += 1
                 if iternum % 1200 == 0:
                     # only update once every second
-                    self.update_console() 
+                    self.update_console()
                 self.tb.main_loop(command_line_mode = True)
                 #QtCore.QCoreApplication.processEvents()
                 time.sleep(1/120)
@@ -92,172 +88,6 @@ class MainLoop():
     def update_console(self):
         print("Connection status: %s" % self.bot_status_dict['connect_status'])
         print("Trivia status: %s" % self.bot_status_dict['trivia_status'])
-
-
-"""
-class MainWindow(QWidget):
-
-    def update_gui(self):
-        '''
-        This takes all variables from the active tb 
-        '''
-        self.connect_status.setText(self.bot_status_dict['connect_status'])
-        if self.bot_status_dict['connect_status'] == 'Active':
-            self.connect_status.setStyleSheet("QLabel { color : green; }");    
-        else:
-            self.connect_status.setStyleSheet("QLabel { color : red; }");    
-
-            
-        try:
-            self.bot_status_dict['trivia_status'] = self.tb.active_session.trivia_status
-        except:
-            self.bot_status_dict['trivia_status'] = "Inactive"
-        self.trivia_status.setText(self.bot_status_dict['trivia_status'])
-        if self.bot_status_dict['trivia_status'] == 'Active':
-            self.trivia_status.setStyleSheet("QLabel { color : green; }");    
-        elif self.bot_status_dict['trivia_status'] == 'Finished':
-            self.trivia_status.setStyleSheet("QLabel { color : blue; }");    
-        else:
-            self.trivia_status.setStyleSheet("QLabel { color : red; }");    
-            
-        
-        
-        if self.tb:
-            self.trivia_start_button.setVisible(True)
-            if self.tb.trivia_active:
-                self.category_label.setVisible(True)
-                self.question_label.setVisible(True)
-                self.answer_label.setVisible(True)
-                self.top3_label.setVisible(True)
-                self.top3_variable_text.setText(self.tb.active_session.check_top(3))
-                if str(self.tb.active_session.session_config['music_mode']) == 'true' or self.tb.active_session.session_config['music_mode'] == True:
-                    self.trivia_startq_button.setVisible(True)
-                else:
-                    self.trivia_skip_button.setVisible(True)
-                if self.tb.active_session.session_config['mode'] == 'poll' or self.tb.active_session.session_config['mode'] == 'poll2':    
-                    self.trivia_endq_button.setVisible(True)
-                if self.tb.active_session.questionasked:
-                    self.category_variable_text.setVisible(True)
-                    self.question_variable_text.setVisible(True)
-                    self.answer_variable_text.setVisible(True)
-                    self.top3_variable_text.setVisible(True)
-                    self.question_no_variable_text.setVisible(True)
-                    self.category_variable_text.setText(self.tb.active_session.active_question.category)
-                    self.question_variable_text.setText(self.tb.active_session.active_question.question)
-                    self.answer_variable_text.setText(', '.join(self.tb.active_session.active_question.answers))
-                    self.question_no_variable_text.setText(self.tb.active_session.report_question_numbers())
-                else:
-                    self.category_variable_text.setVisible(False)
-                    self.question_variable_text.setVisible(False)
-                    self.answer_variable_text.setVisible(False)
-                    self.question_no_variable_text.setVisible(False)
-                    self.category_variable_text.setText("")
-                    self.question_variable_text.setText("")
-                    self.answer_variable_text.setText("")
-                    self.top3_variable_text.setText("")
-                    self.question_no_variable_text.setText("")
-
-        else:
-            self.set_all_invisible()
-            
-        # special cases
-        if self.bot_status_dict['trivia_status'] == "Finished":
-            self.trivia_start_button.setText("Start Trivia")
-            self.trivia_skip_button.setVisible(False)
-            self.trivia_endq_button.setVisible(False)
-            
-    def set_all_invisible(self):
-        self.category_label.setVisible(False)
-        self.question_label.setVisible(False)
-        self.answer_label.setVisible(False)            
-        self.top3_label.setVisible(False)
-        self.category_variable_text.setVisible(False)
-        self.question_variable_text.setVisible(False)
-        self.question_no_variable_text.setVisible(False)
-        self.answer_variable_text.setVisible(False)
-        self.top3_variable_text.setVisible(False)
-        self.trivia_start_button.setVisible(False)
-        self.trivia_skip_button.setVisible(False)
-        self.trivia_startq_button.setVisible(False)
-        self.trivia_endq_button.setVisible(False)
-    
-    def toggle_connect(self):
-        logging.debug("Connect %s " % self.connection_active)
-        if self.connection_active:
-            self.bot_status_dict['connect_status'] = 'Inactive'
-            self.bot_status_dict = self.bot_status_dict_init
-            self.set_all_invisible()
-            self.update_gui()
-            self.end_connection()
-        else:
-            self.bot_status_dict['connect_status'] = 'Active'
-            self.connect()
-            
-    def toggle_start_trivia(self):
-        if not self.tb.active_session.trivia_active:
-            self.trivia_start_button.setText("Stop Trivia")
-            self.tb.start_session()
-        else:
-            self.trivia_start_button.setText("Start Trivia")
-            self.tb.active_session.force_end_of_trivia()
-        
-    def skip_question(self):
-        if self.tb.active_session.trivia_active:
-            try:
-                self.tb.active_session.skip_question()
-            except:
-                logging.debug("Error on skipping question : %s" % traceback.print_exc())
-                
-    def start_question(self):
-        if self.tb.active_session.trivia_active:
-            try:
-                self.tb.active_session.start_question()
-            except:
-                logging.debug("Error on starting question : %s" % traceback.print_exc())
-                
-    def end_question(self):
-        if self.tb.active_session.trivia_active:
-            try:
-                logging.info("Ending question")
-                self.tb.active_session.end_question()
-            except:
-                logging.debug("Error on ending question : %s" % traceback.print_exc())
-        
-    def connect(self):
-        self.tb = TriviaBot()  
-        if self.tb.valid:
-            self.connect_button.setText("Disconnect")
-            self.connection_active = True
-            logging.debug("Starting connect loop")
-            iternum = 0
-            while self.tb.valid:
-                iternum += 1
-                if iternum % 120 == 0:
-                    # only update once every second
-                    self.update_gui() 
-                self.tb.main_loop(command_line_mode = False)
-                QtCore.QCoreApplication.processEvents()
-                time.sleep(1/120)
-        else:
-            msg = QMessageBox()
-            msg.setWindowTitle("Error message")
-            msg.setText("Error message:\n%s" % self.tb.error_msg)
-            msg.exec_()
-            
-    def hide_other_buttons(self):
-        self.trivia_start_button.setVisible(False)
-        self.trivia_skip_button.setVisible(False)
-        self.trivia_endq_button.setVisible(False)
-        self.trivia_startq_button.setVisible(False)
-        self.trivia_start_button.setText("Start Trivia")
-    def end_connection(self):
-        logging.debug("Ending connection.")
-        self.connection_active = False
-        self.connect_button.setText("Connect")
-        self.hide_other_buttons()
-        self.tb.stop_bot()
-"""
-
 
 # SETTINGS
 # TriviaBot object sets up and manages Session objects
@@ -276,6 +106,22 @@ class TriviaBot(object):
         with open(os.path.join(THIS_FILEPATH,'config','auth_config.yml'),'r') as f:
             temp_config = yaml.safe_load(f)
             self.validate_auth_config(temp_config)
+
+        # Connect a database?
+        #TODO: Support for MySQL/Maria
+
+        if self.trivia_config['use_db_for_users'] or self. trivia_config['use_db_for_questions'] and self.trivia_config['sqlite_db'] != '':
+            try:
+                logging.debug("Setting up database connection to %s" % self.trivia_config['sqlite_db'])
+                self.db = sqlite3.connect(self.trivia_config['sqlite_db'])
+
+                self.create_db_tables()
+            except:
+                logging.debug("Failure to connect to database")
+                self.db = None
+
+            pprint.pprint(self.db)
+
 
         if self.valid:
             try:
@@ -302,6 +148,20 @@ class TriviaBot(object):
             logging.debug("Invalid setup - please check trivia_config.yml file")
 
 
+    def create_db_tables(self):
+        if self.db is not None:
+
+            #try:
+            cur = self.db.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username, created, updated, sessions_played, score, highest_rank)")
+            cur.execute("CREATE TABLE IF NOT EXISTS user_cat_stats(id INTEGER, category, answered, score)")
+            cur.execute("CREATE TABLE IF NOT EXISTS user_hint_stats(id INTEGER, hint_1_used, hint_2_used, hint_1_score, hint_2_score)") 
+
+            #except:
+            #    logging.debug("DB: Error creating database tables")
+        else:
+            logging.debug("DB: Tables not created, no DB connection")
+
     def validate_trivia_config(self,temp_config):
         for k, v in temp_config.items():
             if k == 'filename':
@@ -309,7 +169,7 @@ class TriviaBot(object):
                     self.error_msg = "Config error: Filename %s does not end with .csv" % v
                     logging.debug(self.error_msg)
                     self.valid = False
-            elif k in ['question_count','hint_time1','hint_time2','skip_time','question_delay','question_bonusvalue']:
+            elif k in ['question_count','hint_time1','hint_time2','skip_time','question_delay','question_bonusvalue','question_value','hint_1_value', 'hint_2_value']:
                 if type(v) != int:
                     self.error_msg = "Config error: Error with %s -> %s not being an integer" % (k,v)
                     logging.debug(self.error_msg)
@@ -329,21 +189,11 @@ class TriviaBot(object):
                     self.error_msg = "Config error: Order must be 'ordered' or 'random' only"
                     logging.debug(self.error_msg)
                     self.valid = False
-            elif k == 'music_mode':
+            elif k in ['use_db_for_users', 'use_db_for_questions'] :
                 if type(v) != bool:
-                    self.error_msg = "Config error: Music mode must be set to true or false"
+                    self.error_msg = "Config error: %s must be set to true or false" % (k)
                     logging.debug(self.error_msg)
                     self.valid = False
-                if v == True:
-                    if "poll2" not in temp_config['mode']:
-                        self.error_msg = "Config error: When using music mode, mode 'poll2' must be chosen"
-                        logging.debug(self.error_msg)
-                        self.valid = False
-                    if "infinite" not in temp_config['length']:
-                        self.error_msg = "Config error: When using music mode, length 'infinite' must be chosen"
-                        logging.debug(self.error_msg)
-                        self.valid = False
-
 
         if self.valid:
             logging.debug("Passed trivia_config validation.")
@@ -381,7 +231,7 @@ class TriviaBot(object):
         logging.debug("Starting session...")
         if not self.trivia_active:
             if not self.active_session or start_new_override: #if there's already a session, ignore, unless from command
-                self.active_session = Session(self.cb, self.trivia_config)
+                self.active_session = Session(self.cb, self.trivia_config, self.db)
             self.active_session.trivia_status = "Active"
             logging.debug(self.active_session.trivia_status)
             self.cb.s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
@@ -558,7 +408,7 @@ class TriviaBot(object):
             iternum = 0
             while self.valid:
                 iternum += 1
-                if iternum % 1200 == 0:
+                if iternum % 4800 == 0:
                     try:
                         logging.debug("Iternum %s : trivia_active %s active_session.trivia_active %s" % (iternum, self.trivia_active, self.active_session.trivia_active))
                     except:
@@ -628,9 +478,12 @@ class NullSession():
 
 class Session(object):
 
-    def __init__(self, cb, trivia_config):
+    db = None
+
+    def __init__(self, cb, trivia_config, db):
         logging.debug("Begin setting up Session...")
         logging.debug("Setting up session constants...")
+        self.db = db
         self.cb = cb
         self.userscores = {}                         # Dictionary holding user scores, kept in '!' and loaded/created upon trivia. [1,2,3] 1: Session score 2: Total trivia points 3: Total wins
         self.SWITCH = True                           # Switch to keep bot connection running
@@ -643,6 +496,10 @@ class Session(object):
         self.questions = []
         self.answered_questions = []
         self.active_question = None
+        self.hints_given = 0
+        self.question_value = int(trivia_config['question_value'])
+        self.hint_1_value = int(trivia_config['hint_1_value'])
+        self.hint_2_value = int(trivia_config['hint_2_value'])
         self.trivia_status = "Inactive"
         self.users = []
         self.admin_commands_list = {'!triviaend':self.force_end_of_trivia,
@@ -672,77 +529,70 @@ class Session(object):
         logging.debug(out_str)
         self.valid = True
         try:
-            if self.session_config['music_mode']:
-                # in music mode, do not load a trivia set, instead do nothing
-                self.question_count = 99999
-                self.ts = {}
-                self.ss = {}
-
-            else:
-                logging.debug("Loading trivia data...")
+            logging.debug("Loading trivia data...")
+            try:
+                with open(os.path.join(THIS_FILEPATH,'config',self.session_config['file_name']),'r',encoding=self.session_config['csv_encoding']) as f:
+                    data_source = f.read()
+                data = csv.reader(data_source.splitlines(),quotechar='"', delimiter=',',quoting=csv.QUOTE_ALL, skipinitialspace=True)
+            except:
+                logging.debug("Error on reading csv file. Check encoding format set in trivia_config is the same as csv file")
+            self.ts = {}
+            for idx, i in enumerate(data):
                 try:
-                    with open(os.path.join(THIS_FILEPATH,'config',self.session_config['file_name']),'r',encoding=self.session_config['csv_encoding']) as f:
-                        data_source = f.read()
-                    data = csv.reader(data_source.splitlines(),quotechar='"', delimiter=',',quoting=csv.QUOTE_ALL, skipinitialspace=True)
-                except:
-                    logging.debug("Error on reading csv file. Check encoding format set in trivia_config is the same as csv file")
-                self.ts = {}
-                for idx, i in enumerate(data):
-                    try:
-                        answer, answer2, answer3, answer4, answer5 = None, None, None, None, None
-                        if len(i) == 8:
-                            category, question, answer, answer2, answer3, answer4, answer5, creator = i
-                        elif len(i) == 5:
-                            category, question, answer, answer2, creator = i
-                        else:
-                            category, question, answer = i
-                            creator = 'Anon'
-                        if question.lower() == 'question':
-                            logging.debug("Data line was ignored for csv header")
-                        elif answer != '' and category != '' and question != '':
-                            self.ts[idx] = {'category':category, 'question':question, 'answer':answer,'answer2':answer2, 'answer3':answer3, 'answer4':answer4, 'answer5':answer5,'creator':creator}
-                        else:
-                            logging.debug("Data line was ignored, make sure category, question and answer are non null fields: %s" % i)
-                    except Exception as e:
-                        logging.debug("Error on data line, check number of fields: %s" % i)
-                        logging.debug("Exception: %s " % e)
-
-                if self.session_config['mode'] == 'poll2':
-                    logging.debug("Mode set to poll2, only taking questions with valid answer/answer2...")
-                    valid_keys = [i for i in self.ts if self.ts[i]['answer2'] != '']
-                    new_ts = {}
-                    for i in valid_keys:
-                        new_ts[i] = self.ts[i]
-                    self.ts = new_ts
-
-                self.tsrows = len(self.ts.keys())
-
-
-                if self.tsrows < self.session_config['question_count']:
-                    self.session_config['question_count'] = int(self.tsrows)
-                    logging.debug("Warning: Trivia questions for session exceeds trivia set's population. Setting session equal to max questions.")
-
-                logging.debug("Creating session set data. Population %s, session %s" % (self.tsrows, self.session_config['question_count']))
-
-                if self.session_config['category_distribution'] == 'random':
-                    self.create_random_trivia_set()
-                elif self.session_config['category_distribution'] == 'distributed':
-                    self.create_distributed_trivia_set()
-                try:
-
-                    for k, v in self.ss.items():
-                        try:
-                            self.questions.append(Question(v, self.session_config))
-                        except Exception as e:
-                            logging.debug("Error %s -> %s on question creation: %s" % (k,v,e))
+                    answer, answer2, answer3, answer4, answer5 = None, None, None, None, None
+                    if len(i) == 8:
+                        category, question, answer, answer2, answer3, answer4, answer5, creator = i
+                    elif len(i) == 5:
+                        category, question, answer, answer2, creator = i
+                    else:
+                        category, question, answer = i
+                        creator = 'Anon'
+                    if question.lower() == 'question':
+                        logging.debug("Data line was ignored for csv header")
+                    elif answer != '' and category != '' and question != '':
+                        self.ts[idx] = {'category':category, 'question':question, 'answer':answer,'answer2':answer2, 'answer3':answer3, 'answer4':answer4, 'answer5':answer5,'creator':creator}
+                    else:
+                        logging.debug("Data line was ignored, make sure category, question and answer are non null fields: %s" % i)
                 except Exception as e:
-                    logging.debug("Error %s on question creation" % e)
-                if self.session_config['length'] == 'infinite':
-                    self.question_count = 999999
-                else:
-                    self.question_count = len(self.questions)
+                    logging.debug("Error on data line, check number of fields: %s" % i)
+                    logging.debug("Exception: %s " % e)
 
-                logging.debug("Finished setting up Session.")
+            if self.session_config['mode'] == 'poll2':
+                logging.debug("Mode set to poll2, only taking questions with valid answer/answer2...")
+                valid_keys = [i for i in self.ts if self.ts[i]['answer2'] != '']
+                new_ts = {}
+                for i in valid_keys:
+                    new_ts[i] = self.ts[i]
+                self.ts = new_ts
+
+            self.tsrows = len(self.ts.keys())
+
+
+            if self.tsrows < self.session_config['question_count']:
+                self.session_config['question_count'] = int(self.tsrows)
+                logging.debug("Warning: Trivia questions for session exceeds trivia set's population. Setting session equal to max questions.")
+
+            logging.debug("Creating session set data. Population %s, session %s" % (self.tsrows, self.session_config['question_count']))
+
+            if self.session_config['category_distribution'] == 'random':
+                self.create_random_trivia_set()
+            elif self.session_config['category_distribution'] == 'distributed':
+                self.create_distributed_trivia_set()
+            try:
+
+                for k, v in self.ss.items():
+                    try:
+                        self.questions.append(Question(v, self.session_config))
+                    except Exception as e:
+                        logging.debug("Error %s -> %s on question creation: %s" % (k,v,e))
+            except Exception as e:
+                logging.debug("Error %s on question creation" % e)
+            if self.session_config['length'] == 'infinite':
+                self.question_count = 999999
+            else:
+                self.question_count = len(self.questions)
+
+            logging.debug("Finished setting up Session.")
 
         except Exception as e:
             logging.debug("Error on data load. Check trivia set and make sure file_name matches in config, and that file matches columns/headers correctly\nError code:\n>> %s" % e)
@@ -870,39 +720,30 @@ class Session(object):
             return "%s / %s" % (self.questionno, self.question_count)
 
     def call_question(self):
-        if self.session_config['music_mode']:
-            try:
-                # create the question based on config/music/ contents each time
-                with open(os.path.join(THIS_FILEPATH,'config','music','artist.txt'),'r') as f:
-                    artist = f.read()
-                with open(os.path.join(THIS_FILEPATH,'config','music','track.txt'),'r') as f:
-                    track = f.read()
-                self.active_question = Question([artist,track],self.session_config,music_mode=True)
-                self.active_question.activate_question(self.bonus_round, int(self.session_config['question_bonusvalue']))
-                self.questionasked = True
-                self.cb.send_message("Question %s: %s" % (self.questionno, self.active_question.question_string))
-                logging.debug(self.active_question)
-            except Exception as e:
-                logging.debug("Error on calling next question, ending trivia...%s" % str(e))
-                self.force_end_of_trivia()
-        else:
-            try:
-                self.active_question = self.questions.pop()
-                if self.session_config['length'] == 'infinite':
-                    # add the question back, to the start of the index (so its not popped next)
-                    self.questions = [self.active_question] + self.questions
-                self.active_question.activate_question(self.bonus_round, int(self.session_config['question_bonusvalue']))
-                self.questionasked = True
-                self.cb.send_message("Q#%s: %s" % (self.questionno, self.active_question.question_string))
-                logging.debug(self.active_question)
-            except:
-                logging.debug("Error on calling next question, ending trivia...")
-                self.force_end_of_trivia()
+        try:
+            self.active_question = self.questions.pop()
+            if self.session_config['length'] == 'infinite':
+                # add the question back, to the start of the index (so its not popped next)
+                self.questions = [self.active_question] + self.questions
+            self.active_question.activate_question(self.bonus_round, int(self.session_config['question_bonusvalue']))
+            self.questionasked = True
+            self.hints_given = 0
+            self.cb.send_message("Q#%s: %s" % (self.questionno, self.active_question.question_string))
+            logging.debug(self.active_question)
+        except:
+            logging.debug("Error on calling next question, ending trivia...")
+            self.force_end_of_trivia()
+
         self.write_question_variable()
 
 
     def question_answered(self, user, answer_slot=None):
         if self.session_config['mode'] == 'single':
+            if self.hints_given > 1:
+                self.active_question.point_value = self.hint_2_value
+            elif self.hints_given > 0:
+                self.active_question.point_value = self.hint_1_value
+
             user.points += self.active_question.point_value
             self.active_question.active = False
             self.answered_questions.append(self.active_question)
@@ -984,7 +825,7 @@ class Session(object):
                 return user
         else:
             logging.debug("Creating new user %s" % username)
-            new_user = User(username)
+            new_user = User(username, self.db)
             self.users.append(new_user)
             return new_user
 
@@ -1062,12 +903,14 @@ class Session(object):
         try:
             if self.questionasked and self.active_question.hint_1:
                 self.cb.send_message("Hint: %s " % self.active_question.hint_1)
+                self.hints_given += 1
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
     def call_hint2(self):
         try:
             if self.questionasked and self.active_question.hint_2:
                 self.cb.send_message("Hint: %s " % self.active_question.hint_2)
+                self.hints_given += 1
         except:
             logging.debug("Error on hint 1 %s" % traceback.print_exc())
 
@@ -1239,6 +1082,14 @@ class Session(object):
                         else:
                             match = self.active_question.check_match(message)
                             if match:
+                                hints_used = (1 if self.active_question.hint1_asked else 0) + (1 if self.active_question.hint2_asked else 0)
+                                points = self.active_question.point_value
+                                if hints_used == 1:
+                                    points = self.active_question.hint_1_value
+                                elif hints_used == 2:
+                                    points = self.active_question.hint_2_value
+                                user.record_correct_answer(self.active_question.category, points, hints_used)
+
                                 self.question_answered(user)
 
         else:
@@ -1251,23 +1102,19 @@ class Question(object):
     '''
     Takes a row from the session set dataframe and converts into object
     '''
-    def __init__(self, row, session_config,music_mode=False):
+    def __init__(self, row, session_config):
         self.session_config = session_config
         self.active = False
-        if music_mode:
-            self.question = "Listen to audio..."
-            self.answers = [row[0],row[1]]
-            self.answers = [i for i in self.answers if i != '']
-            self.category = "Music"
-            self.creator = ''
-        else:
-            self.question = str(row['question'][0]).upper() + row['question'][1:]
-            self.answers = [row['answer'],row['answer2'],row['answer3'],row['answer4'],row['answer5']]
-            self.answers = [i for i in self.answers if i != '' and i is not None]
-            self.answers = [i for i in self.answers if i == i]
-            self.category = row['category']
-            if 'category' in row:
-                self.creator = row['creator']
+
+        self.question = str(row['question'][0]).upper() + row['question'][1:]
+        self.answers = [row['answer'],row['answer2'],row['answer3'],row['answer4'],row['answer5']]
+        self.answers = [i for i in self.answers if i != '' and i is not None]
+        self.answers = [i for i in self.answers if i == i]
+
+        self.category = row['category']
+
+        if 'category' in row:
+            self.creator = row['creator']
 
         if self.session_config['mode'] == 'poll2':
             try:
@@ -1276,7 +1123,9 @@ class Question(object):
                 logging.debug("ERROR ON PARSING QUESTION WITH ANSWER/ANSWER2, CHECK TRIVIA SOURCE")
 
         self.question_string = "%s: %s" % (self.category, self.question)
-        self.point_value = 1
+        self.point_value = self.session_config['question_value']
+        self.hint_1_value = self.session_config['hint_1_value']
+        self.hint_2_value = self.session_config['hint_2_value']
         self.set_hints()
         self.hint1_asked = False
         self.hint2_asked = False
@@ -1362,7 +1211,7 @@ class Question(object):
 
         hint2 = re.sub('[aeiou]','▯',prehint,flags=re.I)
 
-        if hint2 != prehint:
+        if hint2 != prehint and hint2 != self.hint_1:
             self.hint_2 = hint2
         else:
             self.hint_2 = ''
@@ -1442,10 +1291,28 @@ class Question(object):
 
 
 class User(object):
-    def __init__(self,username):
+
+    db = None
+    has_db_record = False
+
+
+    def __init__(self, username, db):
+        self.db = db
+        self.id = -1
         self.points = 0
         self.username = username
         self.last_msg_time = datetime.datetime.now()
+        self.created = ''
+        self.sessions_played = 1
+        self.score = 0
+        self.highest_rank = 99999999999
+
+        self.cat_stats = {}
+        self.hint_stats = {}
+
+        self.get_user_record()
+        self.update_user_record()
+
     def validate_message_time(self):
         if self.last_msg_time + datetime.timedelta(seconds=1) < datetime.datetime.now():
             self.last_msg_time = datetime.datetime.now()
@@ -1453,6 +1320,91 @@ class User(object):
             return True
         else:
             return False
+
+    def record_correct_answer(self, category, points, hints_used):
+
+        if category in self.cat_stats:
+            self.cat_stats[category]['answered'] += 1
+            self.cat_stats[category]['score'] += points
+        else:
+            self.cat_stats[category] = {}
+            self.cat_stats[category]['answered'] = 1
+            self.cat_stats[category]['score'] = points
+
+        if category not in self.hint_stats:
+            self.hint_stats[category] = {'hint_1_used' : 0, 'hint_2_used' : 0, 'hint_1_score' : 0 , 'hint_2_score' : 0 }
+
+        if hints_used > 0:
+            if hints_used > 1:
+                self.hint_stats[category]['hint_2_used'] += 1
+                self.hint_stats[category]['hint_2_score'] += points
+            else:
+                self.hint_stats[category]['hint_1_used'] += 1
+                self.hint_stats[category]['hint_1_score'] += points
+
+        if True:
+
+            pprint.pprint("==== %s stats ===" % self.username)
+            pprint.pprint("Current points: %s Total score: %s " % (self.points, self.score))
+            pprint.pprint(self.cat_stats)
+            pprint.pprint(self.hint_stats)
+
+
+        if self.db is not None:
+            if not self.has_db_record:
+                self.create_initial_record()
+
+            # Record user details
+            #CREATE TABLE user_cat_stats(id INTEGER, category, answered, score);
+            #CREATE TABLE user_hint_stats(id INTEGER, hint_1_used, hint_2_used, hint_1_score, hint_2_score);
+
+    def update_user_record(self):
+        if self.db is not None:
+            if self.id != -1:
+                cur = self.db.cursor()
+                logging.debug("TODO: Update user record")
+                self.sessions_played += 1
+
+                res = cur.execute("UPDATE users SET updated = datetime('now'), sessions_played = ?, score = ?, highest_rank = ? WHERE id = ?", \
+                    (self.sessions_played, self.score, self.highest_rank, self.id))
+                self.db.commit()
+        else:
+            logging.debug("No DB, so can't update user record")
+
+    def get_user_record(self):
+        if self.db is not None:
+            cur = self.db.cursor()
+            # (id INTEGER PRIMARY KEY, username, created, updated, sessions_played, score, highest_rank);
+            res = cur.execute("SELECT id, created, updated, sessions_played, score, highest_rank FROM users WHERE username = ?", (self.username,))
+            dat = res.fetchone()
+
+            pprint.pprint("Returned user record:")
+            pprint.pprint(dat)
+
+            if dat is not None:
+                self.id = dat[0]
+                self.created = dat[1]
+                self.updated = dat[2]
+                self.sessions_played = dat[3]
+                self.score = dat[4]
+                self.highest_rank = dat[5]
+            else:
+                self.create_initial_record()
+        else:
+            logging.debug("No DB, so no existing user record")
+
+    def create_initial_record(self):
+        if self.db is not None:
+
+            logging.debug("Creating a new user record")
+
+            cur = self.db.cursor()
+            cur.execute("INSERT INTO users (created, username, sessions_played, score, highest_rank) VALUES (datetime('now'), ?, 0, 0, 99999999999)", (self.username,))
+            self.db.commit()
+        else:
+            logging.debug("No DB, so can't create a new user record")
+
+
 
 
 class ChatBot(object):
