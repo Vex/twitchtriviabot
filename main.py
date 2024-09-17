@@ -16,7 +16,7 @@ import os
 import sqlite3
 import pprint
 
-from collections import Counter 
+from collections import Counter
 
 # try:
 #     THIS_FILEPATH = os.path.dirname( sys.executable)
@@ -154,8 +154,8 @@ class TriviaBot(object):
             #try:
             cur = self.db.cursor()
             cur.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username, created, updated, sessions_played, score, highest_rank)")
-            cur.execute("CREATE TABLE IF NOT EXISTS user_cat_stats(id INTEGER, category, answered, score)")
-            cur.execute("CREATE TABLE IF NOT EXISTS user_hint_stats(id INTEGER, hint_1_used, hint_2_used, hint_1_score, hint_2_score)") 
+            cur.execute("CREATE TABLE IF NOT EXISTS user_cat_stats(user_id INTEGER, category, answered, score)")
+            cur.execute("CREATE TABLE IF NOT EXISTS user_hint_stats(user_id INTEGER, category, hint_1_used, hint_2_used, hint_1_score, hint_2_score)") 
 
             #except:
             #    logging.debug("DB: Error creating database tables")
@@ -1299,12 +1299,12 @@ class User(object):
     def __init__(self, username, db):
         self.db = db
         self.id = -1
-        self.points = 0
+        self.points = 0             # Current session
         self.username = username
         self.last_msg_time = datetime.datetime.now()
         self.created = ''
         self.sessions_played = 1
-        self.score = 0
+        self.score = 0              # All time score
         self.highest_rank = 99999999999
 
         self.cat_stats = {}
@@ -1312,6 +1312,9 @@ class User(object):
 
         self.get_user_record()
         self.update_user_record()
+
+        self.get_user_cat_stats()
+        self.get_user_hint_stats()
 
     def validate_message_time(self):
         if self.last_msg_time + datetime.timedelta(seconds=1) < datetime.datetime.now():
@@ -1323,6 +1326,8 @@ class User(object):
 
     def record_correct_answer(self, category, points, hints_used):
 
+        self.score += points
+
         if category in self.cat_stats:
             self.cat_stats[category]['answered'] += 1
             self.cat_stats[category]['score'] += points
@@ -1330,6 +1335,8 @@ class User(object):
             self.cat_stats[category] = {}
             self.cat_stats[category]['answered'] = 1
             self.cat_stats[category]['score'] = points
+
+        self.cat_stats[category]['dirty'] = True
 
         if category not in self.hint_stats:
             self.hint_stats[category] = {'hint_1_used' : 0, 'hint_2_used' : 0, 'hint_1_score' : 0 , 'hint_2_score' : 0 }
@@ -1342,6 +1349,8 @@ class User(object):
                 self.hint_stats[category]['hint_1_used'] += 1
                 self.hint_stats[category]['hint_1_score'] += points
 
+            self.hint_stats[category]['dirty'] = True
+
         if True:
 
             pprint.pprint("==== %s stats ===" % self.username)
@@ -1350,19 +1359,101 @@ class User(object):
             pprint.pprint(self.hint_stats)
 
 
+
         if self.db is not None:
             if not self.has_db_record:
                 self.create_initial_record()
 
+            self.update_user_cat_stats(category)
+            self.update_user_hint_stats(category)
+            self.update_user_record()
+
             # Record user details
-            #CREATE TABLE user_cat_stats(id INTEGER, category, answered, score);
-            #CREATE TABLE user_hint_stats(id INTEGER, hint_1_used, hint_2_used, hint_1_score, hint_2_score);
+            #CREATE TABLE user_cat_stats(user_id INTEGER, category, answered, score);
+            #CREATE TABLE user_hint_stats(user_id INTEGER, hint_1_used, hint_2_used, hint_1_score, hint_2_score);
+
+    def update_user_cat_stats(self, category):
+
+        if self.db is not None:
+            if self.id != -1:
+                cur = self.db.cursor()
+                logging.debug("DB: Updating user cat stats record %d %s" % (self.id, category))
+
+                # NOTE: Trailing comma in parameters is to ensure that a tuple is passed
+                res = cur.execute("SELECT user_id FROM user_cat_stats WHERE user_id = ? AND category = ?", (self.id, category) )
+                dat = res.fetchone()
+
+                if dat is not None:
+                    res = cur.execute("UPDATE user_cat_stats SET answered = ?, score = ? WHERE user_id = ? AND category = ?", \
+                        (self.cat_stats[category]['answered'], self.cat_stats[category]['score'], self.id, category))
+                else:
+                    res = cur.execute("INSERT INTO user_cat_stats ( user_id, category, answered, score) VALUES (?, ?, ?, ?) ", \
+                        (self.id, category, self.cat_stats[category]['answered'], self.cat_stats[category]['score']))
+
+                self.db.commit()
+                self.cat_stats[category]['dirty'] = False
+        else:
+            logging.debug("No DB, so can't update user category stats record")
+
+    def update_user_hint_stats(self, category):
+
+        if self.db is not None:
+            if self.id != -1:
+                cur = self.db.cursor()
+                logging.debug("DB: Updating user hint stats record %d %s" % (self.id, category))
+
+                res = cur.execute("SELECT user_id FROM user_hint_stats WHERE user_id = ? AND category = ? ", (self.id, category) )
+                dat = res.fetchone()
+
+                if dat is not None:
+                    res = cur.execute("UPDATE user_hint_stats SET hint_1_used = ?, hint_2_used = ?, hint_1_score = ?, hint_2_score = ?  WHERE user_id = ? AND category = ? ", \
+                        (self.hint_stats[category]['hint_1_used'], self.hint_stats[category]['hint_2_used'], self.hint_stats[category]['hint_1_score'], \
+                            self.hint_stats[category]['hint_2_score'], self.id, category))
+                else:
+                    res = cur.execute("INSERT INTO user_hint_stats ( user_id, category, hint_1_used, hint_2_used, hint_1_score, hint_2_score) VALUES (?, ?, ?, ?, ?, ?) ", \
+                        (self.id, category, self.hint_stats[category]['hint_1_used'], self.hint_stats[category]['hint_2_used'], \
+                            self.hint_stats[category]['hint_1_score'], self.hint_stats[category]['hint_2_score']))
+
+                self.db.commit()
+                self.hint_stats[category]['dirty'] = False
+        else:
+            logging.debug("No DB, so can't update user hint stats record")
+
+
+    def get_user_cat_stats(self):
+        if self.db is not None:
+            cur = self.db.cursor()
+
+            if self.id is not None and self.id >0:
+
+                # NOTE: Trailing comma in parameters is to ensure that a tuple is passed
+                res = cur.execute("SELECT user_id, category, answered, score FROM user_cat_stats WHERE user_id = ?", (self.id, ) )
+                dat = res.fetchall()
+
+                if dat is not None:
+                    for r in dat:
+                        self.cat_stats[r[1]] = {'answered' : r[2], 'score' : r[3]}
+
+
+    def get_user_hint_stats(self):
+        if self.db is not None:
+            cur = self.db.cursor()
+
+            if self.id is not None and self.id >0:
+                # NOTE: Trailing comma in parameters is to ensure that a tuple is passed
+                res = cur.execute("SELECT user_id, hint_1_used, hint_2_used, hint_1_score, hint_2_score, category FROM user_hint_stats WHERE user_id = ?", (self.id, ))
+                dat = res.fetchall()
+
+                if dat is not None:
+                    for r  in dat:
+                        self.hint_stats[r[5]] = {'hint_1_used' : r[1], 'hint_2_used' : r[2], 'hint_1_score' : r[3] , 'hint_2_score' : r[4] }
+
 
     def update_user_record(self):
         if self.db is not None:
             if self.id != -1:
                 cur = self.db.cursor()
-                logging.debug("TODO: Update user record")
+                logging.debug("DB: Updating user record %d" % self.id)
                 self.sessions_played += 1
 
                 res = cur.execute("UPDATE users SET updated = datetime('now'), sessions_played = ?, score = ?, highest_rank = ? WHERE id = ?", \
@@ -1388,6 +1479,7 @@ class User(object):
                 self.sessions_played = dat[3]
                 self.score = dat[4]
                 self.highest_rank = dat[5]
+                self.has_db_record = True
             else:
                 self.create_initial_record()
         else:
@@ -1401,6 +1493,8 @@ class User(object):
             cur = self.db.cursor()
             cur.execute("INSERT INTO users (created, username, sessions_played, score, highest_rank) VALUES (datetime('now'), ?, 0, 0, 99999999999)", (self.username,))
             self.db.commit()
+            self.has_db_record = True
+
         else:
             logging.debug("No DB, so can't create a new user record")
 
@@ -1468,7 +1562,7 @@ class ChatBot(object):
                 self.s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
                 logging.debug("Pong sent")
             else:
-                username = re.search(r"\w+", response).group(0) 
+                username = re.search(r"\w+", response).group(0)
                 if username == self.bot_config['nick']:  # Ignore this bot's messages
                     pass
                 else:
